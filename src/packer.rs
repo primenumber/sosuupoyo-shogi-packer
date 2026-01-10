@@ -1,0 +1,175 @@
+use crate::pext::{pext_board_as_u128, pext_board_lower_u64, pext_u64};
+use crate::{Color, Hand, PieceKind, Position};
+
+pub const BUFFER_SIZE: usize = 32;
+
+pub trait Packer {
+    fn pack(&self, position: &Position, buffer: &mut [u8; BUFFER_SIZE]) -> Option<()>;
+    fn unpack(&self, buffer: &[u8; BUFFER_SIZE], position: &mut Position) -> Option<()>;
+}
+
+pub struct SSPv1();
+
+impl SSPv1 {
+    fn pack_hands(hand_black: &Hand, hand_white: &Hand) -> u64 {
+        let mut result = 0u64;
+        let mut count = 0;
+        let hand_order = [
+            PieceKind::Pawn,
+            PieceKind::Lance,
+            PieceKind::Knight,
+            PieceKind::Silver,
+            PieceKind::Bishop,
+            PieceKind::Rook,
+            PieceKind::Gold,
+        ];
+        for pt in hand_order.iter() {
+            let i = pt.index();
+            let count_black = hand_black.0[i] as u32;
+            let count_white = hand_white.0[i] as u32;
+            count += count_black;
+            result |= (1u64.wrapping_shl(count_white) - 1).wrapping_shl(count);
+            count += count_white;
+        }
+        result
+    }
+
+    // Pack without hands and color bits
+    // Assumes that hand_color_bits is already prepared
+    pub fn pack_impl(
+        position: &Position,
+        hand_color_bits: u64,
+        buf: &mut [u8; BUFFER_SIZE],
+    ) -> Option<()> {
+        let mut tmp = [0u64; 4];
+        let black_bb = position.player_bb(Color::Black);
+        let white_bb = position.player_bb(Color::White);
+        let occupied = black_bb | white_bb;
+        let king_bb = position.piece_kind_bitboard(PieceKind::King);
+        let occupied_without_kings_bb = occupied ^ king_bb;
+        let occupied_without_kings_compact = pext_board_as_u128(occupied, !king_bb);
+        let black_king_pos = position.king_square(Color::Black).0 as u64;
+        let white_king_pos = position.king_square(Color::White).0 as u64;
+        let hand_bits_offset =
+            occupied_without_kings_bb.0.count_ones() + occupied_without_kings_bb.1.count_ones();
+        let color_bits = pext_board_lower_u64(white_bb, occupied_without_kings_bb)
+            | hand_color_bits.wrapping_shl(hand_bits_offset);
+
+        let pawn_bb = position.piece_kind_bitboard(PieceKind::Pawn)
+            | position.piece_kind_bitboard(PieceKind::ProPawn);
+        let non_pawn_pieces_bb = occupied_without_kings_bb ^ pawn_bb;
+        let non_pawn_bits = pext_board_lower_u64(non_pawn_pieces_bb, occupied_without_kings_bb);
+
+        //let lance_bb = position.piece_kind_bitboard(PieceKind::Lance)
+        //    | position.piece_kind_bitboard(PieceKind::ProLance);
+        //let lance_bits = pext_board_lower_u64(lance_bb, non_pawn_pieces_bb);
+        let knight_bb = position.piece_kind_bitboard(PieceKind::Knight)
+            | position.piece_kind_bitboard(PieceKind::ProKnight);
+        let knight_bits = pext_board_lower_u64(knight_bb, non_pawn_pieces_bb);
+        let silver_bb = position.piece_kind_bitboard(PieceKind::Silver)
+            | position.piece_kind_bitboard(PieceKind::ProSilver);
+        let silver_bits = pext_board_lower_u64(silver_bb, non_pawn_pieces_bb);
+        let bishop_bb = position.piece_kind_bitboard(PieceKind::Bishop)
+            | position.piece_kind_bitboard(PieceKind::ProBishop);
+        let bishop_bits = pext_board_lower_u64(bishop_bb, non_pawn_pieces_bb);
+        let rook_bb = position.piece_kind_bitboard(PieceKind::Rook)
+            | position.piece_kind_bitboard(PieceKind::ProRook);
+        let rook_bits = pext_board_lower_u64(rook_bb, non_pawn_pieces_bb);
+        let gold_bb = position.piece_kind_bitboard(PieceKind::Gold);
+        let gold_bits = pext_board_lower_u64(gold_bb, non_pawn_pieces_bb);
+        let promoted_bb = position.piece_kind_bitboard(PieceKind::ProPawn)
+            | position.piece_kind_bitboard(PieceKind::ProLance)
+            | position.piece_kind_bitboard(PieceKind::ProKnight)
+            | position.piece_kind_bitboard(PieceKind::ProSilver)
+            | position.piece_kind_bitboard(PieceKind::ProBishop)
+            | position.piece_kind_bitboard(PieceKind::ProRook);
+        let promoted_bits = pext_board_lower_u64(promoted_bb, occupied_without_kings_bb ^ gold_bb);
+
+        let bit3_mask = bishop_bits | rook_bits | gold_bits;
+        let bit1 = silver_bits | bit3_mask;
+        let bit2 = knight_bits | bit3_mask;
+        let bit3 = pext_u64(bishop_bits | rook_bits, bit3_mask);
+        let bit4 = pext_u64(rook_bits, bishop_bits | rook_bits);
+
+        tmp[0] =
+            occupied_without_kings_compact.wrapping_shl(1) as u64 | position.side_to_move() as u64;
+        tmp[1] = occupied_without_kings_compact.wrapping_shr(63) as u64
+            | black_king_pos.wrapping_shl(16)
+            | white_king_pos.wrapping_shl(23)
+            | promoted_bits.wrapping_shl(30);
+        tmp[2] = non_pawn_bits | bit1.wrapping_shl(38) | bit2.wrapping_shl(58);
+        tmp[3] = bit2.wrapping_shr(6)
+            | bit3.wrapping_shl(14)
+            | bit4.wrapping_shl(22)
+            | color_bits.wrapping_shl(26);
+        for i in 0..4 {
+            buf[i * 8..(i + 1) * 8].copy_from_slice(&tmp[i].to_le_bytes());
+        }
+        Some(())
+    }
+}
+
+impl Packer for SSPv1 {
+    fn pack(&self, position: &Position, buf: &mut [u8; BUFFER_SIZE]) -> Option<()> {
+        let hand_color_bits =
+            Self::pack_hands(&position.hand(Color::Black), &position.hand(Color::White));
+        Self::pack_impl(position, hand_color_bits, buf)
+    }
+
+    fn unpack(&self, _buffer: &[u8; BUFFER_SIZE], _position: &mut Position) -> Option<()> {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::position::{Bitboard, Color, Position, Square};
+
+    #[test]
+    fn test_pack_hands() {
+        let hand_black = Hand([2, 1, 0, 0, 1, 0, 0, 0]);
+        let hand_white = Hand([1, 0, 1, 0, 0, 1, 0, 0]);
+        let packed = SSPv1::pack_hands(&hand_black, &hand_white);
+        assert_eq!(packed, 0b1010100);
+    }
+
+    #[test]
+    fn test_pack_impl() {
+        let hands = [Hand([0; 8]), Hand([0; 8])];
+        let player_bb = [
+            Bitboard(0x5028_140A_0503_8140, 0x2_81C0),
+            Bitboard(0x5028_140A_0503_8140 >> 6, 0x2_81C0 >> 6),
+        ];
+        let piece_bb = [
+            Bitboard(0x1108_8442_2110_8844, 0x0000_0000_0000_8844), // Pawn
+            Bitboard(0x0000_0000_0000_0101, 0x0000_0000_0002_0200), // Lance
+            Bitboard(0x0000_0000_0002_0200, 0x0000_0000_0000_0101), // Knight
+            Bitboard(0x4040_0000_0404_0000, 0x0000_0000_0000_0000), // Silver
+            Bitboard(0x0000_0000_0000_0400, 0x0000_0000_0000_0080), // Bishop
+            Bitboard(0x0000_0000_0001_0000, 0x0000_0000_0000_0002), // Rook
+            Bitboard(0x0020_2008_0800_0000, 0x0000_0000_0000_0000), // Gold
+            Bitboard(0x0000_1010_0000_0000, 0x0000_0000_0000_0000), // King
+            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProPawn
+            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProLance
+            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProKnight
+            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProSilver
+            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProBishop
+            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProRook
+        ];
+        let king_square = [Square(44), Square(36)];
+        let position = Position::new(hands, player_bb, piece_bb, king_square, Color::Black);
+
+        let mut buffer = [0u8; BUFFER_SIZE];
+        SSPv1::pack_impl(&position, 0, &mut buffer).unwrap();
+
+        assert_eq!(
+            buffer,
+            [
+                0x8A, 0x1E, 0x2F, 0x5A, 0x54, 0x54, 0xB4, 0xE8, 0xF1, 0xA2, 0x2C, 0x12, 0x00, 0x00,
+                0x00, 0x00, 0x39, 0x67, 0x92, 0x39, 0x27, 0xF6, 0x6F, 0xF0, 0x3C, 0xCF, 0xB0, 0xCD,
+                0x31, 0xD3, 0xCC, 0x31
+            ]
+        );
+    }
+}
