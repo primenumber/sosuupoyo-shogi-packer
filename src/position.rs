@@ -113,33 +113,61 @@ pub struct Piece {
     value: u8,
 }
 
+#[allow(dead_code)]
 pub const P_B_PAWN: Piece = Piece { value: 0x00 };
+#[allow(dead_code)]
 pub const P_B_LANCE: Piece = Piece { value: 0x01 };
+#[allow(dead_code)]
 pub const P_B_KNIGHT: Piece = Piece { value: 0x02 };
+#[allow(dead_code)]
 pub const P_B_SILVER: Piece = Piece { value: 0x03 };
+#[allow(dead_code)]
 pub const P_B_BISHOP: Piece = Piece { value: 0x04 };
+#[allow(dead_code)]
 pub const P_B_ROOK: Piece = Piece { value: 0x05 };
+#[allow(dead_code)]
 pub const P_B_GOLD: Piece = Piece { value: 0x06 };
+#[allow(dead_code)]
 pub const P_B_KING: Piece = Piece { value: 0x07 };
+#[allow(dead_code)]
 pub const P_B_PRO_PAWN: Piece = Piece { value: 0x08 };
+#[allow(dead_code)]
 pub const P_B_PRO_LANCE: Piece = Piece { value: 0x09 };
+#[allow(dead_code)]
 pub const P_B_PRO_KNIGHT: Piece = Piece { value: 0x0A };
+#[allow(dead_code)]
 pub const P_B_PRO_SILVER: Piece = Piece { value: 0x0B };
+#[allow(dead_code)]
 pub const P_B_PRO_BISHOP: Piece = Piece { value: 0x0C };
+#[allow(dead_code)]
 pub const P_B_PRO_ROOK: Piece = Piece { value: 0x0D };
+#[allow(dead_code)]
 pub const P_W_PAWN: Piece = Piece { value: 0x10 };
+#[allow(dead_code)]
 pub const P_W_LANCE: Piece = Piece { value: 0x11 };
+#[allow(dead_code)]
 pub const P_W_KNIGHT: Piece = Piece { value: 0x12 };
+#[allow(dead_code)]
 pub const P_W_SILVER: Piece = Piece { value: 0x13 };
+#[allow(dead_code)]
 pub const P_W_BISHOP: Piece = Piece { value: 0x14 };
+#[allow(dead_code)]
 pub const P_W_ROOK: Piece = Piece { value: 0x15 };
+#[allow(dead_code)]
 pub const P_W_GOLD: Piece = Piece { value: 0x16 };
+#[allow(dead_code)]
 pub const P_W_KING: Piece = Piece { value: 0x17 };
+#[allow(dead_code)]
 pub const P_W_PRO_PAWN: Piece = Piece { value: 0x18 };
+#[allow(dead_code)]
 pub const P_W_PRO_LANCE: Piece = Piece { value: 0x19 };
+#[allow(dead_code)]
 pub const P_W_PRO_KNIGHT: Piece = Piece { value: 0x1A };
+#[allow(dead_code)]
 pub const P_W_PRO_SILVER: Piece = Piece { value: 0x1B };
+#[allow(dead_code)]
 pub const P_W_PRO_BISHOP: Piece = Piece { value: 0x1C };
+#[allow(dead_code)]
 pub const P_W_PRO_ROOK: Piece = Piece { value: 0x1D };
 
 impl Piece {
