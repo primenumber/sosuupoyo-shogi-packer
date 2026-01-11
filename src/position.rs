@@ -1,7 +1,12 @@
 //! Mimimal implementation of shogi position representation.
 //! Implemented based on shogi_core crate.
 
+use std::fmt::Write;
 use std::ops::{BitAnd, BitOr, BitXor, Not};
+
+trait ToUsi {
+    fn to_usi<W: Write>(&self, sink: &mut W) -> std::fmt::Result;
+}
 
 #[derive(Clone, Copy)]
 #[repr(align(16))]
@@ -53,7 +58,29 @@ pub enum Color {
     White,
 }
 
-#[derive(Clone, Copy)]
+impl Color {
+    fn index(&self) -> usize {
+        match self {
+            Color::Black => 0,
+            Color::White => 1,
+        }
+    }
+
+    fn from_index(index: usize) -> Self {
+        unsafe { std::mem::transmute(index as u8) }
+    }
+}
+
+impl ToUsi for Color {
+    fn to_usi<W: Write>(&self, sink: &mut W) -> std::fmt::Result {
+        match self {
+            Color::Black => write!(sink, "b"),
+            Color::White => write!(sink, "w"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PieceKind {
     Pawn,
     Lance,
@@ -75,11 +102,88 @@ impl PieceKind {
     pub fn index(&self) -> usize {
         *self as usize
     }
+
+    pub fn from_index(index: usize) -> Self {
+        unsafe { std::mem::transmute(index as u8) }
+    }
 }
 
+#[derive(Clone, Copy)]
 pub struct Piece {
-    kind: PieceKind,
-    color: Color,
+    value: u8,
+}
+
+pub const P_B_PAWN: Piece = Piece { value: 0x00 };
+pub const P_B_LANCE: Piece = Piece { value: 0x01 };
+pub const P_B_KNIGHT: Piece = Piece { value: 0x02 };
+pub const P_B_SILVER: Piece = Piece { value: 0x03 };
+pub const P_B_BISHOP: Piece = Piece { value: 0x04 };
+pub const P_B_ROOK: Piece = Piece { value: 0x05 };
+pub const P_B_GOLD: Piece = Piece { value: 0x06 };
+pub const P_B_KING: Piece = Piece { value: 0x07 };
+pub const P_B_PRO_PAWN: Piece = Piece { value: 0x08 };
+pub const P_B_PRO_LANCE: Piece = Piece { value: 0x09 };
+pub const P_B_PRO_KNIGHT: Piece = Piece { value: 0x0A };
+pub const P_B_PRO_SILVER: Piece = Piece { value: 0x0B };
+pub const P_B_PRO_BISHOP: Piece = Piece { value: 0x0C };
+pub const P_B_PRO_ROOK: Piece = Piece { value: 0x0D };
+pub const P_W_PAWN: Piece = Piece { value: 0x10 };
+pub const P_W_LANCE: Piece = Piece { value: 0x11 };
+pub const P_W_KNIGHT: Piece = Piece { value: 0x12 };
+pub const P_W_SILVER: Piece = Piece { value: 0x13 };
+pub const P_W_BISHOP: Piece = Piece { value: 0x14 };
+pub const P_W_ROOK: Piece = Piece { value: 0x15 };
+pub const P_W_GOLD: Piece = Piece { value: 0x16 };
+pub const P_W_KING: Piece = Piece { value: 0x17 };
+pub const P_W_PRO_PAWN: Piece = Piece { value: 0x18 };
+pub const P_W_PRO_LANCE: Piece = Piece { value: 0x19 };
+pub const P_W_PRO_KNIGHT: Piece = Piece { value: 0x1A };
+pub const P_W_PRO_SILVER: Piece = Piece { value: 0x1B };
+pub const P_W_PRO_BISHOP: Piece = Piece { value: 0x1C };
+pub const P_W_PRO_ROOK: Piece = Piece { value: 0x1D };
+
+impl Piece {
+    pub fn new(color: Color, kind: PieceKind) -> Self {
+        let kind_index = kind.index() as u8;
+        let color_index = color.index() as u8;
+        Piece {
+            value: kind_index | (color_index << 4),
+        }
+    }
+
+    pub fn kind(&self) -> PieceKind {
+        let kind_index = (self.value & 0x0F) as usize;
+        PieceKind::from_index(kind_index)
+    }
+
+    pub fn color(&self) -> Color {
+        let color_index = (self.value >> 4) as usize;
+        Color::from_index(color_index)
+    }
+}
+
+impl ToUsi for Piece {
+    fn to_usi<W: Write>(&self, sink: &mut W) -> std::fmt::Result {
+        const PIECE_STRS: [[&str; 2]; 14] = [
+            ["P", "p"],
+            ["L", "l"],
+            ["N", "n"],
+            ["S", "s"],
+            ["B", "b"],
+            ["R", "r"],
+            ["G", "g"],
+            ["K", "k"],
+            ["+P", "+p"],
+            ["+L", "+l"],
+            ["+N", "+n"],
+            ["+S", "+s"],
+            ["+B", "+b"],
+            ["+R", "+r"],
+        ];
+        let kind_index = self.kind().index();
+        let color_index = self.color().index();
+        write!(sink, "{}", PIECE_STRS[kind_index][color_index])
+    }
 }
 
 // Hand representation: [Pawn, Lance, Knight, Silver, Bishop, Rook, Gold, padding]
@@ -87,39 +191,129 @@ pub struct Piece {
 #[repr(align(8))]
 pub struct Hand(pub [u8; 8]);
 
+impl ToUsi for [Hand; 2] {
+    fn to_usi<W: Write>(&self, sink: &mut W) -> std::fmt::Result {
+        const PIECE_STRS: [[&str; 2]; 7] = [
+            ["P", "p"],
+            ["L", "l"],
+            ["N", "n"],
+            ["S", "s"],
+            ["B", "b"],
+            ["R", "r"],
+            ["G", "g"],
+        ];
+        let mut is_empty = true;
+        for color in 0..2 {
+            for kind in 0..7 {
+                let count = self[color].0[kind];
+                for _ in 0..count {
+                    write!(sink, "{}", PIECE_STRS[kind][color])?;
+                    is_empty = false;
+                }
+            }
+        }
+        if is_empty {
+            write!(sink, "-")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Square(pub u8);
 
 pub struct Position {
+    board: [Option<Piece>; 81],
     hands: [Hand; 2],
     player_bb: [Bitboard; 2],
     piece_bb: [Bitboard; 14],
     king_square: [Square; 2],
     side_to_move: Color,
+    ply: u32,
 }
 
 impl Position {
     pub fn new(
+        board: [Option<Piece>; 81],
         hands: [Hand; 2],
-        player_bb: [Bitboard; 2],
-        piece_bb: [Bitboard; 14],
-        king_square: [Square; 2],
         side_to_move: Color,
+        ply: u32,
     ) -> Self {
+        let mut player_bb = [Bitboard(0, 0); 2];
+        let mut piece_bb = [Bitboard(0, 0); 14];
+        let mut king_square = [Square(0); 2];
+        for (i, square) in board.iter().enumerate() {
+            if let Some(piece) = square {
+                let color_index = piece.color().index();
+                let kind_index = piece.kind().index();
+                let bit = 1u64.wrapping_shl(i as u32 % 63);
+                if i < 63 {
+                    player_bb[color_index].0 |= bit;
+                    piece_bb[kind_index].0 |= bit;
+                } else {
+                    player_bb[color_index].1 |= bit;
+                    piece_bb[kind_index].1 |= bit;
+                }
+                if piece.kind() == PieceKind::King {
+                    king_square[color_index] = Square(i as u8);
+                }
+            }
+        }
         Position {
+            board,
             hands,
             player_bb,
             piece_bb,
             king_square,
             side_to_move,
+            ply,
         }
     }
 
-    pub fn player_bb(&self, color: Color) -> Bitboard {
-        match color {
-            Color::Black => self.player_bb[0],
-            Color::White => self.player_bb[1],
+    fn to_sfen<W: Write>(&self, sink: &mut W) -> std::fmt::Result {
+        for i in 0..9 {
+            let mut vacant = 0;
+            for j in 0..9 {
+                // Safety: the index is in range 0..81.
+                let current = &self.board[9 * (8 - j) + i];
+                if let Some(occupying) = current {
+                    if vacant > 0 {
+                        write!(sink, "{}", vacant)?;
+                        vacant = 0;
+                    }
+                    occupying.to_usi(sink)?;
+                } else {
+                    vacant += 1;
+                }
+            }
+            if vacant > 0 {
+                write!(sink, "{}", vacant)?;
+            }
+            if i < 8 {
+                // Safety: '/' is in ASCII
+                write!(sink, "/")?;
+            }
         }
+        // Safety: ' ' is in ASCII
+        write!(sink, " ")?;
+        self.side_to_move.to_usi(sink)?;
+        // Safety: ' ' is in ASCII
+        write!(sink, " ")?;
+        self.hands.to_usi(sink)?;
+        // Safety: ' ' is in ASCII
+        write!(sink, " ")?;
+        write!(sink, "{}", self.ply)?;
+        Ok(())
+    }
+
+    pub fn to_sfen_owned(&self) -> String {
+        let mut sfen = String::new();
+        self.to_sfen(&mut sfen).unwrap();
+        sfen
+    }
+
+    pub fn player_bb(&self, color: Color) -> Bitboard {
+        self.player_bb[color.index()]
     }
 
     pub fn occupied_bitboard(&self) -> Bitboard {
@@ -141,16 +335,24 @@ impl Position {
     }
 
     pub fn king_square(&self, color: Color) -> Square {
-        match color {
-            Color::Black => self.king_square[0],
-            Color::White => self.king_square[1],
-        }
+        self.king_square[color.index()]
     }
 
     pub fn hand(&self, color: Color) -> &Hand {
-        match color {
-            Color::Black => &self.hands[0],
-            Color::White => &self.hands[1],
-        }
+        &self.hands[color.index()]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_position_to_sfen() {
+        let empty_board = [None; 81];
+        let hands = [Hand([0; 8]), Hand([0; 8])];
+        let position = Position::new(empty_board, hands, Color::Black, 1);
+        let sfen = position.to_sfen_owned();
+        assert_eq!(sfen, "9/9/9/9/9/9/9/9/9 b - 1");
     }
 }

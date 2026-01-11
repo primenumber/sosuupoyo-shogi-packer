@@ -124,7 +124,7 @@ impl Packer for SSPv1 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::position::{Bitboard, Color, Position, Square};
+    use crate::position::*;
 
     #[test]
     fn test_pack_hands() {
@@ -136,29 +136,91 @@ mod tests {
 
     #[test]
     fn test_pack_impl() {
+        let board = [
+            Some(P_W_LANCE),
+            None,
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            None,
+            Some(P_B_LANCE),
+            Some(P_W_KNIGHT),
+            Some(P_W_BISHOP),
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            Some(P_B_ROOK),
+            Some(P_B_KNIGHT),
+            Some(P_W_SILVER),
+            None,
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            None,
+            Some(P_B_SILVER),
+            Some(P_W_GOLD),
+            None,
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            None,
+            Some(P_B_GOLD),
+            Some(P_W_KING),
+            None,
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            None,
+            Some(P_B_KING),
+            Some(P_W_GOLD),
+            None,
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            None,
+            Some(P_B_GOLD),
+            Some(P_W_SILVER),
+            None,
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            None,
+            Some(P_B_SILVER),
+            Some(P_W_KNIGHT),
+            Some(P_W_ROOK),
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            Some(P_B_BISHOP),
+            Some(P_B_KNIGHT),
+            Some(P_W_LANCE),
+            None,
+            Some(P_W_PAWN),
+            None,
+            None,
+            None,
+            Some(P_B_PAWN),
+            None,
+            Some(P_B_LANCE),
+        ];
         let hands = [Hand([0; 8]), Hand([0; 8])];
-        let player_bb = [
-            Bitboard(0x5028_140A_0503_8140, 0x2_81C0),
-            Bitboard(0x5028_140A_0503_8140 >> 6, 0x2_81C0 >> 6),
-        ];
-        let piece_bb = [
-            Bitboard(0x1108_8442_2110_8844, 0x0000_0000_0000_8844), // Pawn
-            Bitboard(0x0000_0000_0000_0101, 0x0000_0000_0002_0200), // Lance
-            Bitboard(0x0000_0000_0002_0200, 0x0000_0000_0000_0101), // Knight
-            Bitboard(0x4040_0000_0404_0000, 0x0000_0000_0000_0000), // Silver
-            Bitboard(0x0000_0000_0000_0400, 0x0000_0000_0000_0080), // Bishop
-            Bitboard(0x0000_0000_0001_0000, 0x0000_0000_0000_0002), // Rook
-            Bitboard(0x0020_2008_0800_0000, 0x0000_0000_0000_0000), // Gold
-            Bitboard(0x0000_1010_0000_0000, 0x0000_0000_0000_0000), // King
-            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProPawn
-            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProLance
-            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProKnight
-            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProSilver
-            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProBishop
-            Bitboard(0x0000_0000_0000_0000, 0x0000_0000_0000_0000), // ProRook
-        ];
-        let king_square = [Square(44), Square(36)];
-        let position = Position::new(hands, player_bb, piece_bb, king_square, Color::Black);
+        let position = Position::new(board, hands, Color::Black, 0);
 
         let mut buffer = [0u8; BUFFER_SIZE];
         SSPv1::pack_impl(&position, 0, &mut buffer).unwrap();
