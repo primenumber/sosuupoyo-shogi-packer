@@ -59,6 +59,7 @@ pub fn pext_board_lower_u64x4(data: [Bitboard; 4], mask: [Bitboard; 4]) -> [u64;
         [data[0].0, data[1].0, data[2].0, data[3].0],
         [mask[0].0, mask[1].0, mask[2].0, mask[3].0],
     );
+    // Since PEXT for the upper bits has only 18 bits set at most, it is expected to finish quickly.
     let bits1 = pext_u64x4(
         [data[0].1, data[1].1, data[2].1, data[3].1],
         [mask[0].1, mask[1].1, mask[2].1, mask[3].1],
