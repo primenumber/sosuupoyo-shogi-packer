@@ -1,3 +1,4 @@
+#![feature(test)]
 mod packer;
 mod pext;
 mod position;

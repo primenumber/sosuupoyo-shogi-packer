@@ -7,18 +7,51 @@ pub fn pext_u64(data: u64, mask: u64) -> u64 {
 }
 
 #[cfg(not(target_feature = "bmi2"))]
-pub fn pext_u64(data: u64, mask: u64) -> u64 {
+pub fn pext_u64(data: u64, mut mask: u64) -> u64 {
     let mut result = 0;
     let mut pos_bit = 1u64;
-    for i in 0..64 {
-        if (mask >> i) & 1 != 0 {
-            if (data >> i) & 1 != 0 {
-                result |= pos_bit;
-            }
-            pos_bit = pos_bit.wrapping_shl(1);
+    while mask != 0 {
+        let lsb_bit = mask & mask.wrapping_neg();
+        if data & lsb_bit != 0 {
+            result |= pos_bit;
         }
+        pos_bit = pos_bit.wrapping_shl(1);
+        mask ^= lsb_bit;
     }
     result
+}
+
+#[cfg(any(target_feature = "bmi2", not(target_feature = "avx2")))]
+pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
+    [
+        pext_u64(data[0], mask[0]),
+        pext_u64(data[1], mask[1]),
+        pext_u64(data[2], mask[2]),
+        pext_u64(data[3], mask[3]),
+    ]
+}
+
+#[cfg(all(not(target_feature = "bmi2"), target_feature = "avx2"))]
+pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
+    use std::arch::x86_64::*;
+    unsafe {
+        let data_vec = _mm256_loadu_si256(data.as_ptr() as *const __m256i);
+        let mut mask_vec = _mm256_loadu_si256(mask.as_ptr() as *const __m256i);
+        let mut result_vec = _mm256_setzero_si256();
+        let mut pos_bit_vec = _mm256_set1_epi64x(1);
+        while _mm256_testz_si256(mask_vec, mask_vec) == 0 {
+            let lsb_vec =
+                _mm256_and_si256(mask_vec, _mm256_sub_epi64(_mm256_setzero_si256(), mask_vec));
+            let data_and_lsb = _mm256_and_si256(data_vec, lsb_vec);
+            let cmp = _mm256_cmpeq_epi64(data_and_lsb, _mm256_setzero_si256());
+            result_vec = _mm256_or_si256(result_vec, _mm256_andnot_si256(cmp, pos_bit_vec));
+            pos_bit_vec = _mm256_slli_epi64(pos_bit_vec, 1);
+            mask_vec = _mm256_xor_si256(mask_vec, lsb_vec);
+        }
+        let mut result = [0u64; 4];
+        _mm256_storeu_si256(result.as_mut_ptr() as *mut __m256i, result_vec);
+        result
+    }
 }
 
 pub fn pext_board_as_u128(data: Bitboard, mask: Bitboard) -> u128 {
@@ -35,4 +68,38 @@ pub fn pext_board_lower_u64(data: Bitboard, mask: Bitboard) -> u64 {
     let bits1 = pext_u64(data.1, mask.1);
     let shift = mask.0.count_ones();
     bits0 | bits1.wrapping_shl(shift)
+}
+
+pub fn pext_board_lower_u64x2(data: [Bitboard; 2], mask: [Bitboard; 2]) -> [u64; 2] {
+    let bits0 = pext_u64x4(
+        [data[0].0, data[0].1, data[1].0, data[1].1],
+        [mask[0].0, mask[0].1, mask[1].0, mask[1].1],
+    );
+    let shift0 = mask[0].0.count_ones();
+    let shift1 = mask[1].0.count_ones();
+    [
+        bits0[0] | bits0[1].wrapping_shl(shift0),
+        bits0[2] | bits0[3].wrapping_shl(shift1),
+    ]
+}
+
+pub fn pext_board_lower_u64x4(data: [Bitboard; 4], mask: [Bitboard; 4]) -> [u64; 4] {
+    let bits0 = pext_u64x4(
+        [data[0].0, data[1].0, data[2].0, data[3].0],
+        [mask[0].0, mask[1].0, mask[2].0, mask[3].0],
+    );
+    let bits1 = pext_u64x4(
+        [data[0].1, data[1].1, data[2].1, data[3].1],
+        [mask[0].1, mask[1].1, mask[2].1, mask[3].1],
+    );
+    let shift0 = mask[0].0.count_ones();
+    let shift1 = mask[1].0.count_ones();
+    let shift2 = mask[2].0.count_ones();
+    let shift3 = mask[3].0.count_ones();
+    [
+        bits0[0] | bits1[0].wrapping_shl(shift0),
+        bits0[1] | bits1[1].wrapping_shl(shift1),
+        bits0[2] | bits1[2].wrapping_shl(shift2),
+        bits0[3] | bits1[3].wrapping_shl(shift3),
+    ]
 }
