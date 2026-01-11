@@ -54,35 +54,6 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
     }
 }
 
-pub fn pext_board_as_u128(data: Bitboard, mask: Bitboard) -> u128 {
-    let bits0 = pext_u64(data.0, mask.0);
-    let bits1 = pext_u64(data.1, mask.1);
-    let shift = mask.0.count_ones();
-    let result0 = bits0 | bits1.wrapping_shl(shift);
-    let result1 = bits1.wrapping_shr(64 - shift);
-    (result1 as u128).wrapping_shl(64) | (result0 as u128)
-}
-
-pub fn pext_board_lower_u64(data: Bitboard, mask: Bitboard) -> u64 {
-    let bits0 = pext_u64(data.0, mask.0);
-    let bits1 = pext_u64(data.1, mask.1);
-    let shift = mask.0.count_ones();
-    bits0 | bits1.wrapping_shl(shift)
-}
-
-pub fn pext_board_lower_u64x2(data: [Bitboard; 2], mask: [Bitboard; 2]) -> [u64; 2] {
-    let bits0 = pext_u64x4(
-        [data[0].0, data[0].1, data[1].0, data[1].1],
-        [mask[0].0, mask[0].1, mask[1].0, mask[1].1],
-    );
-    let shift0 = mask[0].0.count_ones();
-    let shift1 = mask[1].0.count_ones();
-    [
-        bits0[0] | bits0[1].wrapping_shl(shift0),
-        bits0[2] | bits0[3].wrapping_shl(shift1),
-    ]
-}
-
 pub fn pext_board_lower_u64x4(data: [Bitboard; 4], mask: [Bitboard; 4]) -> [u64; 4] {
     let bits0 = pext_u64x4(
         [data[0].0, data[1].0, data[2].0, data[3].0],
