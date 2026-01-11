@@ -56,9 +56,7 @@ impl SSPv1 {
             | position.piece_kind_bitboard(PieceKind::ProPawn);
         let non_pawn_pieces_bb = occupied_without_kings_bb ^ pawn_bb;
 
-        //let lance_bb = position.piece_kind_bitboard(PieceKind::Lance)
-        //    | position.piece_kind_bitboard(PieceKind::ProLance);
-        //let lance_bits = pext_board_lower_u64(lance_bb, non_pawn_pieces_bb);
+        // Notice: lance does not need to be calculated explicitly
         let knight_bb = position.piece_kind_bitboard(PieceKind::Knight)
             | position.piece_kind_bitboard(PieceKind::ProKnight);
         let silver_bb = position.piece_kind_bitboard(PieceKind::Silver)
