@@ -257,8 +257,14 @@ mod tests {
     fn bench_pack(b: &mut Bencher) {
         let position = init_position();
         let mut buffer = [0u8; BUFFER_SIZE];
+        let mut sum = 0;
         b.iter(|| {
-            SSPv1::pack_impl(&position, 0, &mut buffer).unwrap();
+            SSPv1().pack(&position, &mut buffer).unwrap();
+            // Prevent optimization
+            for byte in buffer.iter() {
+                sum += *byte as usize;
+            }
         });
+        assert_ne!(sum, 0);
     }
 }
