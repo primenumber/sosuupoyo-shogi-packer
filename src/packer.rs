@@ -49,13 +49,10 @@ impl SSPFv1 {
         let occupied_without_kings_bb = occupied ^ king_bb;
         let black_king_pos = position.king_square(Color::Black).0 as u64;
         let white_king_pos = position.king_square(Color::White).0 as u64;
-        let hand_bits_offset =
-            occupied_without_kings_bb.0.count_ones() + occupied_without_kings_bb.1.count_ones();
 
         let pawn_bb = position.piece_kind_bitboard(PieceKind::Pawn)
             | position.piece_kind_bitboard(PieceKind::ProPawn);
         let non_pawn_pieces_bb = occupied_without_kings_bb ^ pawn_bb;
-
         // Notice: lance does not need to be calculated explicitly
         let knight_bb = position.piece_kind_bitboard(PieceKind::Knight)
             | position.piece_kind_bitboard(PieceKind::ProKnight);
@@ -65,6 +62,14 @@ impl SSPFv1 {
             | position.piece_kind_bitboard(PieceKind::ProBishop);
         let rook_bb = position.piece_kind_bitboard(PieceKind::Rook)
             | position.piece_kind_bitboard(PieceKind::ProRook);
+        let gold_bb = position.piece_kind_bitboard(PieceKind::Gold);
+        let promoted_bb = position.piece_kind_bitboard(PieceKind::ProPawn)
+            | position.piece_kind_bitboard(PieceKind::ProLance)
+            | position.piece_kind_bitboard(PieceKind::ProKnight)
+            | position.piece_kind_bitboard(PieceKind::ProSilver)
+            | position.piece_kind_bitboard(PieceKind::ProBishop)
+            | position.piece_kind_bitboard(PieceKind::ProRook);
+
         let [knight_bits, silver_bits, bishop_bits, rook_bits] = pext_board_lower_u64x4(
             [knight_bb, silver_bb, bishop_bb, rook_bb],
             [
@@ -74,13 +79,6 @@ impl SSPFv1 {
                 non_pawn_pieces_bb,
             ],
         );
-        let gold_bb = position.piece_kind_bitboard(PieceKind::Gold);
-        let promoted_bb = position.piece_kind_bitboard(PieceKind::ProPawn)
-            | position.piece_kind_bitboard(PieceKind::ProLance)
-            | position.piece_kind_bitboard(PieceKind::ProKnight)
-            | position.piece_kind_bitboard(PieceKind::ProSilver)
-            | position.piece_kind_bitboard(PieceKind::ProBishop)
-            | position.piece_kind_bitboard(PieceKind::ProRook);
         let [non_pawn_bits, color_board_bits, gold_bits, promoted_bits] = pext_board_lower_u64x4(
             [non_pawn_pieces_bb, white_bb, gold_bb, promoted_bb],
             [
@@ -90,6 +88,8 @@ impl SSPFv1 {
                 occupied_without_kings_bb ^ gold_bb,
             ],
         );
+        let hand_bits_offset =
+            occupied_without_kings_bb.0.count_ones() + occupied_without_kings_bb.1.count_ones();
         let color_bits = color_board_bits | hand_color_bits.wrapping_shl(hand_bits_offset);
 
         let bit3_mask = bishop_bits | rook_bits | gold_bits;
@@ -100,12 +100,13 @@ impl SSPFv1 {
             [!king_bb.0, !king_bb.1, bit3_mask, bishop_bits | rook_bits],
         );
         let occupied_low_bits = (!king_bb.0 & 0x7FFF_FFFF_FFFF_FFFF).count_ones();
-        let occupied_without_kings_compact =
-            occupied_lower as u128 | (occupied_upper as u128).wrapping_shl(occupied_low_bits);
+        let occupied_without_kings_compact_lower =
+            (occupied_lower | (occupied_upper).wrapping_shl(occupied_low_bits)).wrapping_shl(1);
+        let occupied_without_kings_compact_upper =
+            (occupied_upper).wrapping_shr(63 - occupied_low_bits);
 
-        tmp[0] =
-            occupied_without_kings_compact.wrapping_shl(1) as u64 | position.side_to_move() as u64;
-        tmp[1] = occupied_without_kings_compact.wrapping_shr(63) as u64
+        tmp[0] = occupied_without_kings_compact_lower | position.side_to_move() as u64;
+        tmp[1] = occupied_without_kings_compact_upper
             | black_king_pos.wrapping_shl(16)
             | white_king_pos.wrapping_shl(23)
             | promoted_bits.wrapping_shl(30);
