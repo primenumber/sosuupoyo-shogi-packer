@@ -8,9 +8,9 @@ pub trait Packer {
     fn unpack(&self, buffer: &[u8; BUFFER_SIZE], position: &mut Position) -> Option<()>;
 }
 
-pub struct SSPv1();
+pub struct SSPFv1();
 
-impl SSPv1 {
+impl SSPFv1 {
     fn pack_hands(hand_black: &Hand, hand_white: &Hand) -> u64 {
         let mut result = 0u64;
         let mut count = 0;
@@ -121,7 +121,7 @@ impl SSPv1 {
     }
 }
 
-impl Packer for SSPv1 {
+impl Packer for SSPFv1 {
     fn pack(&self, position: &Position, buf: &mut [u8; BUFFER_SIZE]) -> Option<()> {
         let hand_color_bits =
             Self::pack_hands(&position.hand(Color::Black), &position.hand(Color::White));
@@ -232,7 +232,7 @@ mod tests {
     fn test_pack_hands() {
         let hand_black = Hand([2, 1, 0, 0, 1, 0, 0, 0]);
         let hand_white = Hand([1, 0, 1, 0, 0, 1, 0, 0]);
-        let packed = SSPv1::pack_hands(&hand_black, &hand_white);
+        let packed = SSPFv1::pack_hands(&hand_black, &hand_white);
         assert_eq!(packed, 0b1010100);
     }
 
@@ -241,7 +241,7 @@ mod tests {
         let position = init_position();
 
         let mut buffer = [0u8; BUFFER_SIZE];
-        SSPv1::pack_impl(&position, 0, &mut buffer).unwrap();
+        SSPFv1::pack_impl(&position, 0, &mut buffer).unwrap();
 
         assert_eq!(
             buffer,
@@ -259,7 +259,7 @@ mod tests {
         let mut buffer = [0u8; BUFFER_SIZE];
         let mut sum = 0;
         b.iter(|| {
-            SSPv1().pack(&position, &mut buffer).unwrap();
+            SSPFv1().pack(&position, &mut buffer).unwrap();
             // Prevent optimization
             for byte in buffer.iter() {
                 sum += *byte as usize;
