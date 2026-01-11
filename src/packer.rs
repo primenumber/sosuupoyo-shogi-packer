@@ -19,9 +19,9 @@ impl SSPv1 {
             PieceKind::Lance,
             PieceKind::Knight,
             PieceKind::Silver,
+            PieceKind::Gold,
             PieceKind::Bishop,
             PieceKind::Rook,
-            PieceKind::Gold,
         ];
         for pt in hand_order.iter() {
             let i = pt.index();
