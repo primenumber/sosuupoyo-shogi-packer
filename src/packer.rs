@@ -1,4 +1,4 @@
-use crate::pext::{pext_board_as_u128, pext_board_lower_u64x4, pext_u64, pext_u64x4};
+use crate::pext::{pext_board_lower_u64x4, pext_u64x4};
 use crate::{Color, Hand, PieceKind, Position};
 
 pub const BUFFER_SIZE: usize = 32;
