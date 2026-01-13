@@ -59,7 +59,7 @@ pub enum Color {
 }
 
 impl Color {
-    fn index(&self) -> usize {
+    const fn index(&self) -> usize {
         match self {
             Color::Black => 0,
             Color::White => 1,
@@ -99,7 +99,7 @@ pub enum PieceKind {
 }
 
 impl PieceKind {
-    pub fn index(&self) -> usize {
+    pub const fn index(&self) -> usize {
         *self as usize
     }
 
@@ -114,64 +114,64 @@ pub struct Piece {
 }
 
 #[allow(dead_code)]
-pub const P_B_PAWN: Piece = Piece { value: 0x00 };
+pub const P_B_PAWN: Piece = Piece::new(Color::Black, PieceKind::Pawn);
 #[allow(dead_code)]
-pub const P_B_LANCE: Piece = Piece { value: 0x01 };
+pub const P_B_LANCE: Piece = Piece::new(Color::Black, PieceKind::Lance);
 #[allow(dead_code)]
-pub const P_B_KNIGHT: Piece = Piece { value: 0x02 };
+pub const P_B_KNIGHT: Piece = Piece::new(Color::Black, PieceKind::Knight);
 #[allow(dead_code)]
-pub const P_B_SILVER: Piece = Piece { value: 0x03 };
+pub const P_B_SILVER: Piece = Piece::new(Color::Black, PieceKind::Silver);
 #[allow(dead_code)]
-pub const P_B_BISHOP: Piece = Piece { value: 0x04 };
+pub const P_B_BISHOP: Piece = Piece::new(Color::Black, PieceKind::Bishop);
 #[allow(dead_code)]
-pub const P_B_ROOK: Piece = Piece { value: 0x05 };
+pub const P_B_ROOK: Piece = Piece::new(Color::Black, PieceKind::Rook);
 #[allow(dead_code)]
-pub const P_B_GOLD: Piece = Piece { value: 0x06 };
+pub const P_B_GOLD: Piece = Piece::new(Color::Black, PieceKind::Gold);
 #[allow(dead_code)]
-pub const P_B_KING: Piece = Piece { value: 0x07 };
+pub const P_B_KING: Piece = Piece::new(Color::Black, PieceKind::King);
 #[allow(dead_code)]
-pub const P_B_PRO_PAWN: Piece = Piece { value: 0x08 };
+pub const P_B_PRO_PAWN: Piece = Piece::new(Color::Black, PieceKind::ProPawn);
 #[allow(dead_code)]
-pub const P_B_PRO_LANCE: Piece = Piece { value: 0x09 };
+pub const P_B_PRO_LANCE: Piece = Piece::new(Color::Black, PieceKind::ProLance);
 #[allow(dead_code)]
-pub const P_B_PRO_KNIGHT: Piece = Piece { value: 0x0A };
+pub const P_B_PRO_KNIGHT: Piece = Piece::new(Color::Black, PieceKind::ProKnight);
 #[allow(dead_code)]
-pub const P_B_PRO_SILVER: Piece = Piece { value: 0x0B };
+pub const P_B_PRO_SILVER: Piece = Piece::new(Color::Black, PieceKind::ProSilver);
 #[allow(dead_code)]
-pub const P_B_PRO_BISHOP: Piece = Piece { value: 0x0C };
+pub const P_B_PRO_BISHOP: Piece = Piece::new(Color::Black, PieceKind::ProBishop);
 #[allow(dead_code)]
-pub const P_B_PRO_ROOK: Piece = Piece { value: 0x0D };
+pub const P_B_PRO_ROOK: Piece = Piece::new(Color::Black, PieceKind::ProRook);
 #[allow(dead_code)]
-pub const P_W_PAWN: Piece = Piece { value: 0x10 };
+pub const P_W_PAWN: Piece = Piece::new(Color::White, PieceKind::Pawn);
 #[allow(dead_code)]
-pub const P_W_LANCE: Piece = Piece { value: 0x11 };
+pub const P_W_LANCE: Piece = Piece::new(Color::White, PieceKind::Lance);
 #[allow(dead_code)]
-pub const P_W_KNIGHT: Piece = Piece { value: 0x12 };
+pub const P_W_KNIGHT: Piece = Piece::new(Color::White, PieceKind::Knight);
 #[allow(dead_code)]
-pub const P_W_SILVER: Piece = Piece { value: 0x13 };
+pub const P_W_SILVER: Piece = Piece::new(Color::White, PieceKind::Silver);
 #[allow(dead_code)]
-pub const P_W_BISHOP: Piece = Piece { value: 0x14 };
+pub const P_W_BISHOP: Piece = Piece::new(Color::White, PieceKind::Bishop);
 #[allow(dead_code)]
-pub const P_W_ROOK: Piece = Piece { value: 0x15 };
+pub const P_W_ROOK: Piece = Piece::new(Color::White, PieceKind::Rook);
 #[allow(dead_code)]
-pub const P_W_GOLD: Piece = Piece { value: 0x16 };
+pub const P_W_GOLD: Piece = Piece::new(Color::White, PieceKind::Gold);
 #[allow(dead_code)]
-pub const P_W_KING: Piece = Piece { value: 0x17 };
+pub const P_W_KING: Piece = Piece::new(Color::White, PieceKind::King);
 #[allow(dead_code)]
-pub const P_W_PRO_PAWN: Piece = Piece { value: 0x18 };
+pub const P_W_PRO_PAWN: Piece = Piece::new(Color::White, PieceKind::ProPawn);
 #[allow(dead_code)]
-pub const P_W_PRO_LANCE: Piece = Piece { value: 0x19 };
+pub const P_W_PRO_LANCE: Piece = Piece::new(Color::White, PieceKind::ProLance);
 #[allow(dead_code)]
-pub const P_W_PRO_KNIGHT: Piece = Piece { value: 0x1A };
+pub const P_W_PRO_KNIGHT: Piece = Piece::new(Color::White, PieceKind::ProKnight);
 #[allow(dead_code)]
-pub const P_W_PRO_SILVER: Piece = Piece { value: 0x1B };
+pub const P_W_PRO_SILVER: Piece = Piece::new(Color::White, PieceKind::ProSilver);
 #[allow(dead_code)]
-pub const P_W_PRO_BISHOP: Piece = Piece { value: 0x1C };
+pub const P_W_PRO_BISHOP: Piece = Piece::new(Color::White, PieceKind::ProBishop);
 #[allow(dead_code)]
-pub const P_W_PRO_ROOK: Piece = Piece { value: 0x1D };
+pub const P_W_PRO_ROOK: Piece = Piece::new(Color::White, PieceKind::ProRook);
 
 impl Piece {
-    pub fn new(color: Color, kind: PieceKind) -> Self {
+    pub const fn new(color: Color, kind: PieceKind) -> Self {
         let kind_index = kind.index() as u8;
         let color_index = color.index() as u8;
         Piece {
