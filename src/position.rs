@@ -369,6 +369,77 @@ impl Position {
     pub fn hand(&self, color: Color) -> &Hand {
         &self.hands[color.index()]
     }
+
+    /// Construct a Position from bitboards instead of board array.
+    /// This is the inverse of extracting player_bb and piece_bb from a Position.
+    pub fn from_bitboards(
+        player_bb: [Bitboard; 2],
+        piece_bb: [Bitboard; 14],
+        hands: [Hand; 2],
+        side_to_move: Color,
+        ply: u32,
+    ) -> Self {
+        let mut board = [None; 81];
+        let mut king_square = [Square(0); 2];
+
+        // For each square, determine the piece (if any)
+        for sq in 0..81 {
+            let (word_idx, bit) = if sq < 63 {
+                (0, 1u64 << sq)
+            } else {
+                (1, 1u64 << (sq - 63))
+            };
+
+            // Check which player owns a piece on this square
+            let color_opt = if word_idx == 0 {
+                if player_bb[0].0 & bit != 0 {
+                    Some(Color::Black)
+                } else if player_bb[1].0 & bit != 0 {
+                    Some(Color::White)
+                } else {
+                    None
+                }
+            } else {
+                if player_bb[0].1 & bit != 0 {
+                    Some(Color::Black)
+                } else if player_bb[1].1 & bit != 0 {
+                    Some(Color::White)
+                } else {
+                    None
+                }
+            };
+
+            if let Some(color) = color_opt {
+                // Find which piece kind is on this square
+                for kind_idx in 0..14 {
+                    let has_piece = if word_idx == 0 {
+                        piece_bb[kind_idx].0 & bit != 0
+                    } else {
+                        piece_bb[kind_idx].1 & bit != 0
+                    };
+                    if has_piece {
+                        let kind = PieceKind::from_index(kind_idx);
+                        let piece = Piece::new(color, kind);
+                        board[sq] = Some(piece);
+                        if kind == PieceKind::King {
+                            king_square[color.index()] = Square(sq as u8);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        Position {
+            board,
+            hands,
+            player_bb,
+            piece_bb,
+            king_square,
+            side_to_move,
+            ply,
+        }
+    }
 }
 
 #[cfg(test)]
