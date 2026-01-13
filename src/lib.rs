@@ -1,5 +1,6 @@
 #![feature(test)]
 mod packer;
+mod pdep;
 mod pext;
 mod position;
 
