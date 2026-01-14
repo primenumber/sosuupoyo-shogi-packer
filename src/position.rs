@@ -8,7 +8,7 @@ trait ToUsi {
     fn to_usi<W: Write>(&self, sink: &mut W) -> std::fmt::Result;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(align(16))]
 pub struct Bitboard(pub u64, pub u64);
 
@@ -52,7 +52,7 @@ impl Not for Bitboard {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Color {
     Black,
     White,
@@ -80,7 +80,7 @@ impl ToUsi for Color {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PieceKind {
     Pawn,
     Lance,
@@ -108,7 +108,7 @@ impl PieceKind {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Piece {
     value: u8,
 }
@@ -215,7 +215,7 @@ impl ToUsi for Piece {
 }
 
 // Hand representation: [Pawn, Lance, Knight, Silver, Bishop, Rook, Gold, padding]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(align(8))]
 pub struct Hand(pub [u8; 8]);
 
@@ -247,9 +247,10 @@ impl ToUsi for [Hand; 2] {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Square(pub u8);
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Position {
     board: [Option<Piece>; 81],
     hands: [Hand; 2],
@@ -453,5 +454,113 @@ mod tests {
         let position = Position::new(empty_board, hands, Color::Black, 1);
         let sfen = position.to_sfen_owned();
         assert_eq!(sfen, "9/9/9/9/9/9/9/9/9 b - 1");
+    }
+
+    #[test]
+    fn test_from_bitboards_empty() {
+        let empty_board = [None; 81];
+        let hands = [Hand([0; 8]), Hand([0; 8])];
+        let original = Position::new(empty_board, hands, Color::Black, 1);
+
+        let reconstructed = Position::from_bitboards(
+            original.player_bb,
+            original.piece_bb,
+            original.hands,
+            original.side_to_move,
+            original.ply,
+        );
+
+        assert_eq!(original, reconstructed);
+    }
+
+    #[test]
+    fn test_from_bitboards_with_pieces() {
+        // Create a board with some pieces
+        let mut board = [None; 81];
+        // Black king at 5i (index 4)
+        board[4] = Some(P_B_KING);
+        // White king at 5a (index 76)
+        board[76] = Some(P_W_KING);
+        // Black pawn at 5g (index 22)
+        board[22] = Some(P_B_PAWN);
+        // White rook at 8b (index 70)
+        board[70] = Some(P_W_ROOK);
+        // Black promoted bishop at 3c (index 56)
+        board[56] = Some(P_B_PRO_BISHOP);
+
+        let hands = [
+            Hand([1, 0, 0, 0, 0, 0, 2, 0]),
+            Hand([0, 1, 0, 0, 0, 0, 0, 0]),
+        ];
+        let original = Position::new(board, hands, Color::White, 42);
+
+        let reconstructed = Position::from_bitboards(
+            original.player_bb,
+            original.piece_bb,
+            original.hands,
+            original.side_to_move,
+            original.ply,
+        );
+
+        assert_eq!(original, reconstructed);
+    }
+
+    #[test]
+    fn test_from_bitboards_startpos() {
+        // Create initial position (SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1)
+        let mut board = [None; 81];
+
+        // 1st rank: White's back rank
+        board[0] = Some(P_W_LANCE);
+        board[9] = Some(P_W_KNIGHT);
+        board[18] = Some(P_W_SILVER);
+        board[27] = Some(P_W_GOLD);
+        board[36] = Some(P_W_KING);
+        board[45] = Some(P_W_GOLD);
+        board[54] = Some(P_W_SILVER);
+        board[63] = Some(P_W_KNIGHT);
+        board[72] = Some(P_W_LANCE);
+
+        // 2nd rank: White's rook and bishop
+        board[10] = Some(P_W_BISHOP);
+        board[64] = Some(P_W_ROOK);
+
+        // 3ed rank: White's pawns
+        for i in 0..9 {
+            board[i * 9 + 2] = Some(P_W_PAWN);
+        }
+
+        // 7th rank: Black's pawns
+        for i in 0..9 {
+            board[i * 9 + 6] = Some(P_B_PAWN);
+        }
+
+        // 8th rank: Black's bishop and rook
+        board[16] = Some(P_B_ROOK);
+        board[70] = Some(P_B_BISHOP);
+
+        // 9th rank: Black's back rank
+        board[8] = Some(P_B_LANCE);
+        board[17] = Some(P_B_KNIGHT);
+        board[26] = Some(P_B_SILVER);
+        board[35] = Some(P_B_GOLD);
+        board[44] = Some(P_B_KING);
+        board[53] = Some(P_B_GOLD);
+        board[62] = Some(P_B_SILVER);
+        board[71] = Some(P_B_KNIGHT);
+        board[80] = Some(P_B_LANCE);
+
+        let hands = [Hand([0; 8]), Hand([0; 8])];
+        let original = Position::new(board, hands, Color::Black, 1);
+
+        let reconstructed = Position::from_bitboards(
+            original.player_bb,
+            original.piece_bb,
+            original.hands,
+            original.side_to_move,
+            original.ply,
+        );
+
+        assert_eq!(original, reconstructed);
     }
 }
