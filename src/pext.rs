@@ -45,7 +45,7 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
         let mut block_mask_vec = _mm256_setzero_si256();
         let mut pos_bit_vec = _mm256_set1_epi8(1);
         let mut popcnt_vec = _mm256_setzero_si256();
-        // byte-wise processing
+        // in-byte processing
         while _mm256_testz_si256(mask_vec, mask_vec) == 0 {
             let lsb_vec =
                 _mm256_and_si256(mask_vec, _mm256_sub_epi8(_mm256_setzero_si256(), mask_vec));
@@ -64,7 +64,7 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
                 _mm256_add_epi8(mask_zero_mask, _mm256_set1_epi8(1)),
             );
         }
-        // word-wise processing
+        // whole-word processing
         let mut data_vec = result_vec;
         let mut mask_vec = block_mask_vec;
         let mut shift_vec = {
