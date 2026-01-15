@@ -299,6 +299,66 @@ impl Position {
         }
     }
 
+    pub fn startpos() -> Self {
+        // Create initial position (SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1)
+        let mut board = [None; 81];
+
+        // 1st rank: White's back rank
+        board[0] = Some(P_W_LANCE);
+        board[9] = Some(P_W_KNIGHT);
+        board[18] = Some(P_W_SILVER);
+        board[27] = Some(P_W_GOLD);
+        board[36] = Some(P_W_KING);
+        board[45] = Some(P_W_GOLD);
+        board[54] = Some(P_W_SILVER);
+        board[63] = Some(P_W_KNIGHT);
+        board[72] = Some(P_W_LANCE);
+
+        // 2nd rank: White's rook and bishop
+        board[10] = Some(P_W_BISHOP);
+        board[64] = Some(P_W_ROOK);
+
+        // 3ed rank: White's pawns
+        for i in 0..9 {
+            board[i * 9 + 2] = Some(P_W_PAWN);
+        }
+
+        // 7th rank: Black's pawns
+        for i in 0..9 {
+            board[i * 9 + 6] = Some(P_B_PAWN);
+        }
+
+        // 8th rank: Black's bishop and rook
+        board[16] = Some(P_B_ROOK);
+        board[70] = Some(P_B_BISHOP);
+
+        // 9th rank: Black's back rank
+        board[8] = Some(P_B_LANCE);
+        board[17] = Some(P_B_KNIGHT);
+        board[26] = Some(P_B_SILVER);
+        board[35] = Some(P_B_GOLD);
+        board[44] = Some(P_B_KING);
+        board[53] = Some(P_B_GOLD);
+        board[62] = Some(P_B_SILVER);
+        board[71] = Some(P_B_KNIGHT);
+        board[80] = Some(P_B_LANCE);
+
+        let hands = [Hand([0; 8]), Hand([0; 8])];
+        Position::new(board, hands, Color::Black, 1)
+    }
+
+    pub fn set_only_kings() -> Self {
+        let mut board = [None; 81];
+        board[36] = Some(P_W_KING);
+        board[44] = Some(P_B_KING);
+        // All other pieces are hand pieces
+        let hands = [
+            Hand([9, 2, 2, 2, 1, 1, 2, 0]),
+            Hand([9, 2, 2, 2, 1, 1, 2, 0]),
+        ];
+        Position::new(board, hands, Color::Black, 1)
+    }
+
     fn to_sfen<W: Write>(&self, sink: &mut W) -> std::fmt::Result {
         for i in 0..9 {
             let mut vacant = 0;
@@ -339,6 +399,10 @@ impl Position {
         let mut sfen = String::new();
         self.to_sfen(&mut sfen).unwrap();
         sfen
+    }
+
+    pub fn board(&self) -> &[Option<Piece>; 81] {
+        &self.board
     }
 
     pub fn player_bb(&self, color: Color) -> Bitboard {
@@ -507,52 +571,7 @@ mod tests {
 
     #[test]
     fn test_from_bitboards_startpos() {
-        // Create initial position (SFEN: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1)
-        let mut board = [None; 81];
-
-        // 1st rank: White's back rank
-        board[0] = Some(P_W_LANCE);
-        board[9] = Some(P_W_KNIGHT);
-        board[18] = Some(P_W_SILVER);
-        board[27] = Some(P_W_GOLD);
-        board[36] = Some(P_W_KING);
-        board[45] = Some(P_W_GOLD);
-        board[54] = Some(P_W_SILVER);
-        board[63] = Some(P_W_KNIGHT);
-        board[72] = Some(P_W_LANCE);
-
-        // 2nd rank: White's rook and bishop
-        board[10] = Some(P_W_BISHOP);
-        board[64] = Some(P_W_ROOK);
-
-        // 3ed rank: White's pawns
-        for i in 0..9 {
-            board[i * 9 + 2] = Some(P_W_PAWN);
-        }
-
-        // 7th rank: Black's pawns
-        for i in 0..9 {
-            board[i * 9 + 6] = Some(P_B_PAWN);
-        }
-
-        // 8th rank: Black's bishop and rook
-        board[16] = Some(P_B_ROOK);
-        board[70] = Some(P_B_BISHOP);
-
-        // 9th rank: Black's back rank
-        board[8] = Some(P_B_LANCE);
-        board[17] = Some(P_B_KNIGHT);
-        board[26] = Some(P_B_SILVER);
-        board[35] = Some(P_B_GOLD);
-        board[44] = Some(P_B_KING);
-        board[53] = Some(P_B_GOLD);
-        board[62] = Some(P_B_SILVER);
-        board[71] = Some(P_B_KNIGHT);
-        board[80] = Some(P_B_LANCE);
-
-        let hands = [Hand([0; 8]), Hand([0; 8])];
-        let original = Position::new(board, hands, Color::Black, 1);
-
+        let original = Position::startpos();
         let reconstructed = Position::from_bitboards(
             original.player_bb,
             original.piece_bb,

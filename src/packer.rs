@@ -141,94 +141,6 @@ mod tests {
     use crate::position::*;
     use test::Bencher;
 
-    fn init_position() -> Position {
-        let board = [
-            Some(P_W_LANCE),
-            None,
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            None,
-            Some(P_B_LANCE),
-            Some(P_W_KNIGHT),
-            Some(P_W_BISHOP),
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            Some(P_B_ROOK),
-            Some(P_B_KNIGHT),
-            Some(P_W_SILVER),
-            None,
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            None,
-            Some(P_B_SILVER),
-            Some(P_W_GOLD),
-            None,
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            None,
-            Some(P_B_GOLD),
-            Some(P_W_KING),
-            None,
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            None,
-            Some(P_B_KING),
-            Some(P_W_GOLD),
-            None,
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            None,
-            Some(P_B_GOLD),
-            Some(P_W_SILVER),
-            None,
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            None,
-            Some(P_B_SILVER),
-            Some(P_W_KNIGHT),
-            Some(P_W_ROOK),
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            Some(P_B_BISHOP),
-            Some(P_B_KNIGHT),
-            Some(P_W_LANCE),
-            None,
-            Some(P_W_PAWN),
-            None,
-            None,
-            None,
-            Some(P_B_PAWN),
-            None,
-            Some(P_B_LANCE),
-        ];
-        let hands = [Hand([0; 8]), Hand([0; 8])];
-        Position::new(board, hands, Color::Black, 0)
-    }
-
     #[test]
     fn test_pack_hands() {
         let hand_black = Hand([2, 1, 0, 0, 1, 0, 0, 0]);
@@ -239,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_pack_impl() {
-        let position = init_position();
+        let position = Position::startpos();
 
         let mut buffer = [0u8; BUFFER_SIZE];
         SSPFv1::pack_impl(&position, 0, &mut buffer).unwrap();
@@ -256,7 +168,7 @@ mod tests {
 
     #[bench]
     fn bench_pack(b: &mut Bencher) {
-        let position = init_position();
+        let position = Position::startpos();
         let mut buffer = [0u8; BUFFER_SIZE];
         let mut sum = 0;
         b.iter(|| {
