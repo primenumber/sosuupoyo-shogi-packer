@@ -243,7 +243,10 @@ impl ToUsi for [Hand; 2] {
         for color in 0..2 {
             for kind in 0..7 {
                 let count = self[color].0[kind];
-                for _ in 0..count {
+                if count >= 2 {
+                    write!(sink, "{}", count)?;
+                }
+                if count >= 1 {
                     write!(sink, "{}", PIECE_STRS[kind][color])?;
                     is_empty = false;
                 }
