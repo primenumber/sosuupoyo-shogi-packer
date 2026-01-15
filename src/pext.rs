@@ -114,18 +114,57 @@ mod tests {
 
     #[test]
     fn test_pext_u64() {
-        let data = 0b1101_0110_1001_1110u64;
-        let mask = 0b1010_1100_1111_0000u64;
+        let data = 0x1234_5678_9ABC_DEF0u64;
+        let mask = 0x0F0F_0F0F_0F0F_0F0Fu64;
         let result = pext_u64(data, mask);
-        assert_eq!(result, 0b1001_1001u64);
+        assert_eq!(result, 0x0000_0000_2468_ACE0u64);
     }
 
     #[test]
     fn test_pext_u64x4() {
-        let data = 0b1101_0110_1001_1110u64;
-        let mask = 0b1010_1100_1111_0000u64;
-        let expected = [0b1001_1001u64; 4];
-        let result = pext_u64x4([data, data, data, data], [mask, mask, mask, mask]);
+        let data = [
+            0x1234_5678_9ABC_DEF0u64,
+            0x468A_CF01_3579_BDE2u64,
+            0x9CF2_58BE_147A_D036u64,
+            0x048C_159D_26AE_37BFu64,
+        ];
+        let mask = [
+            0x0F0F_0F0F_0F0F_0F0Fu64,
+            0xCCCC_AAAA_5555_3333u64,
+            0xFFFF_0000_FFFF_0000u64,
+            0xBEEF_CAFE_BEEF_CAFEu64,
+        ];
+        let expected = [
+            0x0000_0000_2468_ACE0u64,
+            0x0000_0000_5AB0_7DDAu64,
+            0x0000_0000_9CF2_147Au64,
+            0x0000_0A60_4E4E_F0DFu64,
+        ];
+        let result = pext_u64x4(data, mask);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_pext_board_lower_u64x4() {
+        let data = [
+            Bitboard(0x1234_5678_9ABC_DEF0u64, 0x1_2345u64),
+            Bitboard(0x468A_CF01_3579_BDE2u64, 0x0_68ACu64),
+            Bitboard(0x1CF2_58BE_147A_D036u64, 0x1_CF25u64),
+            Bitboard(0x048C_159D_26AE_37BFu64, 0x0_48C1u64),
+        ];
+        let mask = [
+            Bitboard(0x0F0F_0F0F_0F0F_0F0Fu64, 0x0_F0F0u64),
+            Bitboard(0x4CCC_AAAA_5555_3333u64, 0x3_CCCCu64),
+            Bitboard(0x7FFF_0000_FFFF_0000u64, 0x3_FFFFu64),
+            Bitboard(0x3EEF_CAFE_BEEF_CAFEu64, 0x3_EEFCu64),
+        ];
+        let expected = [
+            0x0000_0024_2468_ACE0u64,
+            0x0000_0035_DAB0_7DDAu64,
+            0x0000_E792_9CF2_147Au64,
+            0x0298_0A60_4E4E_F0DFu64,
+        ];
+        let result = pext_board_lower_u64x4(data, mask);
         assert_eq!(result, expected);
     }
 }
