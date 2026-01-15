@@ -1,7 +1,14 @@
 sosuupoyo-shogi-packer
 ====
 
-将棋の局面を256bitのビット列にエンコード・デコードするライブラリです。
+将棋の局面を256bitのビット列に高速にエンコード可能なSSPFv1の参照実装です。
+
+## ファイル構成
+
+- `src/packer.rs`: SSPFv1フォーマットのエンコード実装。
+- `src/position.rs`: 将棋の局面表現。Bitboard、駒、持ち駒、局面を表す最小限の実装（shogi\_coreクレートベース）。
+- `src/pext.rs`: PEXT命令のラッパー。BMI2対応CPUでは`_pext_u64`を使用。
+- `src/pdep.rs`: PDEP命令のラッパー。PEXT同様にBMI2対応CPUでは`_pdep_u64`を使用。
 
 ## SSPFv1 (Sosuupoyo's Shogi Position Format version 1)
 
