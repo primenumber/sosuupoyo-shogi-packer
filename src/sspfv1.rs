@@ -176,10 +176,6 @@ impl Packer for SSPFv1 {
         let bit3 = (tmp[3] >> 14) & 0xFF;
         let bit4 = (tmp[3] >> 22) & 0xF;
         let color_bits = tmp[3] >> 26;
-        eprintln!(
-            "{:016x} {:016x} {:016x} {:016x}",
-            tmp[0], tmp[1], tmp[2], tmp[3]
-        );
         let num_occupied_without_kings = occupied_without_kings_compact_lower.count_ones()
             + occupied_without_kings_compact_upper.count_ones();
         let hand_counts = [
