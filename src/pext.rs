@@ -75,3 +75,26 @@ pub fn pext_board_lower_u64x4(data: [Bitboard; 4], mask: [Bitboard; 4]) -> [u64;
         bits0[3] | bits1[3].wrapping_shl(shift3),
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Bitboard;
+
+    #[test]
+    fn test_pext_u64() {
+        let data = 0b1101_0110_1001_1110u64;
+        let mask = 0b1010_1100_1111_0000u64;
+        let result = pext_u64(data, mask);
+        assert_eq!(result, 0b1001_1001u64);
+    }
+
+    #[test]
+    fn test_pext_u64x4() {
+        let data = 0b1101_0110_1001_1110u64;
+        let mask = 0b1010_1100_1111_0000u64;
+        let expected = [0b1001_1001u64; 4];
+        let result = pext_u64x4([data, data, data, data], [mask, mask, mask, mask]);
+        assert_eq!(result, expected);
+    }
+}
