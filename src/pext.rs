@@ -38,15 +38,46 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
         let data_vec = _mm256_loadu_si256(data.as_ptr() as *const __m256i);
         let mut mask_vec = _mm256_loadu_si256(mask.as_ptr() as *const __m256i);
         let mut result_vec = _mm256_setzero_si256();
-        let mut pos_bit_vec = _mm256_set1_epi64x(1);
+        let mut block_mask_vec = _mm256_setzero_si256();
+        let mut pos_bit_vec = _mm256_set1_epi8(1);
+        let mut popcnt_vec = _mm256_setzero_si256();
+        // byte-wise processing
         while _mm256_testz_si256(mask_vec, mask_vec) == 0 {
             let lsb_vec =
-                _mm256_and_si256(mask_vec, _mm256_sub_epi64(_mm256_setzero_si256(), mask_vec));
+                _mm256_and_si256(mask_vec, _mm256_sub_epi8(_mm256_setzero_si256(), mask_vec));
             let data_and_lsb = _mm256_and_si256(data_vec, lsb_vec);
-            let cmp = _mm256_cmpeq_epi64(data_and_lsb, _mm256_setzero_si256());
+            let mask_zero_mask = _mm256_cmpeq_epi8(lsb_vec, _mm256_setzero_si256());
+            let cmp = _mm256_cmpeq_epi8(data_and_lsb, _mm256_setzero_si256());
             result_vec = _mm256_or_si256(result_vec, _mm256_andnot_si256(cmp, pos_bit_vec));
             pos_bit_vec = _mm256_slli_epi64(pos_bit_vec, 1);
+            block_mask_vec = _mm256_or_si256(
+                block_mask_vec,
+                _mm256_blendv_epi8(pos_bit_vec, _mm256_setzero_si256(), mask_zero_mask),
+            );
             mask_vec = _mm256_xor_si256(mask_vec, lsb_vec);
+            popcnt_vec = _mm256_add_epi8(
+                popcnt_vec,
+                _mm256_add_epi8(mask_zero_mask, _mm256_set1_epi8(1)),
+            );
+        }
+        // word-wise processing
+        let mut data_vec = result_vec;
+        let mut mask_vec = block_mask_vec;
+        let mut shift_vec = {
+            let x = _mm256_add_epi64(popcnt_vec, _mm256_slli_epi64(popcnt_vec, 8));
+            let x = _mm256_add_epi64(x, _mm256_slli_epi64(x, 16));
+            let x = _mm256_add_epi64(x, _mm256_slli_epi64(x, 32));
+            _mm256_slli_epi64(x, 8)
+        };
+        let mut result_vec = _mm256_setzero_si256();
+        let low_byte_mask = _mm256_set1_epi64x(0xFF);
+        for _ in 0..8 {
+            let group_vec = _mm256_and_si256(data_vec, low_byte_mask);
+            let shifted_vec =
+                _mm256_sllv_epi64(group_vec, _mm256_and_si256(shift_vec, low_byte_mask));
+            result_vec = _mm256_or_si256(result_vec, shifted_vec);
+            data_vec = _mm256_srli_epi64(data_vec, 8);
+            shift_vec = _mm256_srli_epi64(shift_vec, 8);
         }
         let mut result = [0u64; 4];
         _mm256_storeu_si256(result.as_mut_ptr() as *mut __m256i, result_vec);
