@@ -36,6 +36,29 @@ impl Bitboard {
             Bitboard(0, 1u64 << (square - 63))
         }
     }
+
+    pub fn at(&self, square: Square) -> bool {
+        let square = square.0 as i32;
+        if square < 63 {
+            (self.0 & (1u64 << square)) != 0
+        } else {
+            (self.1 & (1u64 << (square - 63))) != 0
+        }
+    }
+
+    pub fn peek(&self) -> Option<Square> {
+        if self.0 != 0 {
+            let lsb = self.0 & self.0.wrapping_neg();
+            let index = lsb.trailing_zeros();
+            Some(Square(index as u8))
+        } else if self.1 != 0 {
+            let lsb = self.1 & self.1.wrapping_neg();
+            let index = lsb.trailing_zeros();
+            Some(Square((index + 63) as u8))
+        } else {
+            None
+        }
+    }
 }
 
 impl BitAnd for Bitboard {
@@ -304,7 +327,6 @@ pub struct Square(pub u8);
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Position {
-    board: [Option<Piece>; 81],
     hands: [Hand; 2],
     player_bb: [Bitboard; 2],
     piece_bb: [Bitboard; 14],
@@ -341,7 +363,6 @@ impl Position {
             }
         }
         Position {
-            board,
             hands,
             player_bb,
             piece_bb,
@@ -373,7 +394,7 @@ impl Position {
             let mut vacant = 0;
             for j in 0..9 {
                 // Safety: the index is in range 0..81.
-                let current = &self.board[9 * (8 - j) + i];
+                let current = &self.at(Square((i * 9 + j) as u8));
                 if let Some(occupying) = current {
                     if vacant > 0 {
                         write!(sink, "{}", vacant)?;
@@ -531,8 +552,12 @@ impl Position {
         Ok(())
     }
 
-    pub fn board(&self) -> &[Option<Piece>; 81] {
-        &self.board
+    pub fn board(&self) -> [Option<Piece>; 81] {
+        let mut board = [None; 81];
+        for sq in 0..81 {
+            board[sq] = self.at(Square(sq as u8));
+        }
+        board
     }
 
     pub fn player_bb(&self, color: Color) -> Bitboard {
@@ -546,6 +571,21 @@ impl Position {
             bb.1 |= piece_bb.1;
         }
         bb
+    }
+
+    pub fn at(&self, square: Square) -> Option<Piece> {
+        for (i, bb) in self.piece_bb.iter().enumerate() {
+            if bb.at(square) {
+                let color = if self.player_bb[0].at(square) {
+                    Color::Black
+                } else {
+                    Color::White
+                };
+                let kind = PieceKind::from_index(i);
+                return Some(Piece::new(color, kind));
+            }
+        }
+        None
     }
 
     pub fn piece_kind_bitboard(&self, kind: PieceKind) -> Bitboard {
@@ -574,59 +614,16 @@ impl Position {
         side_to_move: Color,
         ply: u32,
     ) -> Self {
-        let mut board = [None; 81];
         let mut king_square = [Square(0); 2];
 
-        // For each square, determine the piece (if any)
-        for sq in 0..81 {
-            let (word_idx, bit) = if sq < 63 {
-                (0, 1u64 << sq)
-            } else {
-                (1, 1u64 << (sq - 63))
-            };
-
-            // Check which player owns a piece on this square
-            let color_opt = if word_idx == 0 {
-                if player_bb[0].0 & bit != 0 {
-                    Some(Color::Black)
-                } else if player_bb[1].0 & bit != 0 {
-                    Some(Color::White)
-                } else {
-                    None
-                }
-            } else {
-                if player_bb[0].1 & bit != 0 {
-                    Some(Color::Black)
-                } else if player_bb[1].1 & bit != 0 {
-                    Some(Color::White)
-                } else {
-                    None
-                }
-            };
-
-            if let Some(color) = color_opt {
-                // Find which piece kind is on this square
-                for kind_idx in 0..14 {
-                    let has_piece = if word_idx == 0 {
-                        piece_bb[kind_idx].0 & bit != 0
-                    } else {
-                        piece_bb[kind_idx].1 & bit != 0
-                    };
-                    if has_piece {
-                        let kind = PieceKind::from_index(kind_idx);
-                        let piece = Piece::new(color, kind);
-                        board[sq] = Some(piece);
-                        if kind == PieceKind::King {
-                            king_square[color.index()] = Square(sq as u8);
-                        }
-                        break;
-                    }
-                }
+        for color_index in 0..2 {
+            let king_bb = piece_bb[PieceKind::King.index()] & player_bb[color_index];
+            if let Some(sq) = king_bb.peek() {
+                king_square[color_index] = sq;
             }
         }
 
         Position {
-            board,
             hands,
             player_bb,
             piece_bb,
