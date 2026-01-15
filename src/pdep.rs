@@ -20,72 +20,27 @@ pub fn pdep_u64(mut data: u64, mut mask: u64) -> u64 {
     result
 }
 
-#[cfg(any(target_feature = "bmi2", not(target_feature = "avx2")))]
-pub fn pdep_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
-    [
-        pdep_u64(data[0], mask[0]),
-        pdep_u64(data[1], mask[1]),
-        pdep_u64(data[2], mask[2]),
-        pdep_u64(data[3], mask[3]),
-    ]
+pub fn pdep_board_lower_u64(data: u64, mask: Bitboard) -> Bitboard {
+    let shift = mask.0.count_ones();
+    let bits0 = pdep_u64(data, mask.0);
+    let bits1 = pdep_u64(data.wrapping_shr(shift), mask.1);
+    Bitboard(bits0, bits1)
 }
 
-#[cfg(all(not(target_feature = "bmi2"), target_feature = "avx2"))]
-pub fn pdep_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
-    use std::arch::x86_64::*;
-    unsafe {
-        let mut data_vec = _mm256_loadu_si256(data.as_ptr() as *const __m256i);
-        let mut mask_vec = _mm256_loadu_si256(mask.as_ptr() as *const __m256i);
-        let mut result_vec = _mm256_setzero_si256();
-        let one_vec = _mm256_set1_epi64x(1);
-        while _mm256_testz_si256(mask_vec, mask_vec) == 0 {
-            let lsb_vec =
-                _mm256_and_si256(mask_vec, _mm256_sub_epi64(_mm256_setzero_si256(), mask_vec));
-            // Check if data & 1 != 0
-            let data_lsb = _mm256_and_si256(data_vec, one_vec);
-            let cmp = _mm256_cmpeq_epi64(data_lsb, _mm256_setzero_si256());
-            result_vec = _mm256_or_si256(result_vec, _mm256_andnot_si256(cmp, lsb_vec));
-            data_vec = _mm256_srli_epi64(data_vec, 1);
-            mask_vec = _mm256_xor_si256(mask_vec, lsb_vec);
-        }
-        let mut result = [0u64; 4];
-        _mm256_storeu_si256(result.as_mut_ptr() as *mut __m256i, result_vec);
-        result
-    }
-}
-
-/// Inverse of `pext_board_lower_u64x4`.
-/// Deposits lower bits of data into bitboard positions specified by mask.
-pub fn pdep_board_lower_u64x4(data: [u64; 4], mask: [Bitboard; 4]) -> [Bitboard; 4] {
-    let shift0 = mask[0].0.count_ones();
-    let shift1 = mask[1].0.count_ones();
-    let shift2 = mask[2].0.count_ones();
-    let shift3 = mask[3].0.count_ones();
-    let bits0 = pdep_u64x4(
-        [data[0], data[1], data[2], data[3]],
-        [mask[0].0, mask[1].0, mask[2].0, mask[3].0],
+pub fn pdep_board(data: Bitboard, mask: Bitboard) -> Bitboard {
+    let shift = mask.0.count_ones();
+    let bits0 = pdep_u64(data.0, mask.0);
+    let bits1 = pdep_u64(
+        data.0.wrapping_shr(shift) | data.1.wrapping_shl(63 - shift),
+        mask.1,
     );
-    let bits1 = pdep_u64x4(
-        [
-            data[0].wrapping_shr(shift0),
-            data[1].wrapping_shr(shift1),
-            data[2].wrapping_shr(shift2),
-            data[3].wrapping_shr(shift3),
-        ],
-        [mask[0].1, mask[1].1, mask[2].1, mask[3].1],
-    );
-    [
-        Bitboard(bits0[0], bits1[0]),
-        Bitboard(bits0[1], bits1[1]),
-        Bitboard(bits0[2], bits1[2]),
-        Bitboard(bits0[3], bits1[3]),
-    ]
+    Bitboard(bits0, bits1)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pext::{pext_board_lower_u64x4, pext_u64};
+    use crate::pext::pext_u64;
 
     #[test]
     fn test_pdep_u64_basic() {
@@ -120,46 +75,6 @@ mod tests {
             let deposited = pdep_u64(extracted, mask);
             // After roundtrip, we should get the original data masked
             assert_eq!(deposited, data & mask);
-        }
-    }
-
-    #[test]
-    fn test_pdep_u64x4() {
-        let data = [0b1011u64, 0b101u64, 0xABu64, 0x12u64];
-        let mask = [0b11110000u64, 0b10101010u64, 0xFFu64, 0xF0F0u64];
-        let result = pdep_u64x4(data, mask);
-
-        assert_eq!(result[0], pdep_u64(data[0], mask[0]));
-        assert_eq!(result[1], pdep_u64(data[1], mask[1]));
-        assert_eq!(result[2], pdep_u64(data[2], mask[2]));
-        assert_eq!(result[3], pdep_u64(data[3], mask[3]));
-    }
-
-    #[test]
-    fn test_pdep_board_lower_u64x4_roundtrip() {
-        let boards = [
-            Bitboard(0x123456789ABCDEF0, 0x0FEDCBA987654321),
-            Bitboard(0xAAAAAAAAAAAAAAAA, 0x5555555555555555),
-            Bitboard(0xFFFFFFFFFFFFFFFF, 0x0001FFFF),
-            Bitboard(0x0, 0x0),
-        ];
-        let masks = [
-            Bitboard(0xF0F0F0F0F0F0F0F0, 0x0F0F0F0F0F0F0F0F),
-            Bitboard(0xFFFFFFFF00000000, 0x00000000FFFFFFFF),
-            Bitboard(0xFFFFFFFFFFFFFFFF, 0x0001FFFF),
-            Bitboard(0x8040201008040201, 0x0001804020100804),
-        ];
-
-        let extracted = pext_board_lower_u64x4(boards, masks);
-        let deposited = pdep_board_lower_u64x4(extracted, masks);
-
-        for i in 0..4 {
-            assert_eq!(
-                deposited[i],
-                Bitboard(boards[i].0 & masks[i].0, boards[i].1 & masks[i].1),
-                "Mismatch at index {}",
-                i
-            );
         }
     }
 }
