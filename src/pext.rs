@@ -1,12 +1,14 @@
 use crate::Bitboard;
 
 #[cfg(target_feature = "bmi2")]
+#[inline(always)]
 pub fn pext_u64(data: u64, mask: u64) -> u64 {
     use std::arch::x86_64::*;
     unsafe { _pext_u64(data, mask) }
 }
 
 #[cfg(not(target_feature = "bmi2"))]
+#[inline(always)]
 pub fn pext_u64(data: u64, mut mask: u64) -> u64 {
     let mut result = 0;
     let mut pos_bit = 1u64;
@@ -22,6 +24,7 @@ pub fn pext_u64(data: u64, mut mask: u64) -> u64 {
 }
 
 #[cfg(any(target_feature = "bmi2", not(target_feature = "avx2")))]
+#[inline(always)]
 pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
     [
         pext_u64(data[0], mask[0]),
@@ -32,6 +35,7 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
 }
 
 #[cfg(all(not(target_feature = "bmi2"), target_feature = "avx2"))]
+#[inline(always)]
 pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
     use std::arch::x86_64::*;
     unsafe {
@@ -85,6 +89,7 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
     }
 }
 
+#[inline(always)]
 pub fn pext_board_lower_u64x4(data: [Bitboard; 4], mask: [Bitboard; 4]) -> [u64; 4] {
     let bits0 = pext_u64x4(
         [data[0].0, data[1].0, data[2].0, data[3].0],
