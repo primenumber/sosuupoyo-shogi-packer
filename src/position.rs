@@ -4,6 +4,15 @@
 use std::fmt::Write;
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SfenParseError {
+    InvalidFormat,
+    InvalidPiece(char),
+    InvalidColor(char),
+    InvalidHandPiece(char),
+    InvalidPly,
+}
+
 trait ToUsi {
     fn to_usi<W: Write>(&self, sink: &mut W) -> std::fmt::Result;
 }
@@ -196,6 +205,37 @@ impl Piece {
     pub fn color(&self) -> Color {
         let color_index = (self.value >> 4) as usize;
         Color::from_index(color_index)
+    }
+
+    /// Parse a piece from SFEN character.
+    /// `c` is the piece character (P, L, N, S, B, R, G, K and lowercase variants).
+    /// `promoted` indicates if the piece is promoted (preceded by '+').
+    pub fn from_sfen(c: char, promoted: bool) -> Result<Self, SfenParseError> {
+        let color = if c.is_ascii_uppercase() {
+            Color::Black
+        } else {
+            Color::White
+        };
+
+        let base = match c.to_ascii_uppercase() {
+            'P' => 0,
+            'L' => 1,
+            'N' => 2,
+            'S' => 3,
+            'B' => 4,
+            'R' => 5,
+            'G' => 6,
+            'K' => 7,
+            _ => return Err(SfenParseError::InvalidPiece(c)),
+        };
+
+        // Gold(6)とKing(7)は成れない
+        if promoted && base >= 6 {
+            return Err(SfenParseError::InvalidPiece(c));
+        }
+
+        let kind = PieceKind::from_index(if promoted { base + 8 } else { base });
+        Ok(Piece::new(color, kind))
     }
 }
 
@@ -413,6 +453,127 @@ impl Position {
         sfen
     }
 
+    /// Parse a SFEN string into a Position.
+    /// Format: "board side_to_move hand ply"
+    /// Example: "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+    pub fn from_sfen(sfen: &str) -> Result<Self, SfenParseError> {
+        let parts: Vec<&str> = sfen.split_whitespace().collect();
+        if parts.len() != 4 {
+            return Err(SfenParseError::InvalidFormat);
+        }
+
+        let board_str = parts[0];
+        let side_str = parts[1];
+        let hand_str = parts[2];
+        let ply_str = parts[3];
+
+        // Parse board
+        let mut board = [None; 81];
+        let ranks: Vec<&str> = board_str.split('/').collect();
+        if ranks.len() != 9 {
+            return Err(SfenParseError::InvalidFormat);
+        }
+
+        for (rank_idx, rank_str) in ranks.iter().enumerate() {
+            let mut file = 8i32; // Start from file 9 (index 8) going to file 1 (index 0)
+            let mut chars = rank_str.chars().peekable();
+
+            while let Some(c) = chars.next() {
+                if file < 0 {
+                    return Err(SfenParseError::InvalidFormat);
+                }
+
+                if c.is_ascii_digit() {
+                    // Empty squares
+                    let num = c.to_digit(10).unwrap() as i32;
+                    file -= num;
+                } else if c == '+' {
+                    // Promoted piece
+                    let piece_char = chars.next().ok_or(SfenParseError::InvalidFormat)?;
+                    let piece = Piece::from_sfen(piece_char, true)?;
+                    let sq = file as usize * 9 + rank_idx;
+                    board[sq] = Some(piece);
+                    file -= 1;
+                } else {
+                    // Normal piece
+                    let piece = Piece::from_sfen(c, false)?;
+                    let sq = file as usize * 9 + rank_idx;
+                    board[sq] = Some(piece);
+                    file -= 1;
+                }
+            }
+        }
+
+        // Parse side to move
+        let side_to_move = match side_str {
+            "b" => Color::Black,
+            "w" => Color::White,
+            _ => {
+                return Err(SfenParseError::InvalidColor(
+                    side_str.chars().next().unwrap_or('?'),
+                ))
+            }
+        };
+
+        // Parse hand
+        let hands = Self::parse_hand(hand_str)?;
+
+        // Parse ply
+        let ply: u32 = ply_str.parse().map_err(|_| SfenParseError::InvalidPly)?;
+
+        Ok(Position::new(board, hands, side_to_move, ply))
+    }
+
+    fn parse_hand(hand_str: &str) -> Result<[Hand; 2], SfenParseError> {
+        let mut hands = [Hand([0; 8]), Hand([0; 8])];
+
+        if hand_str == "-" {
+            return Ok(hands);
+        }
+
+        let mut chars = hand_str.chars().peekable();
+        while let Some(c) = chars.next() {
+            let mut count = 1u8;
+
+            // Check if it's a digit (count prefix)
+            if c.is_ascii_digit() {
+                count = c.to_digit(10).unwrap() as u8;
+                // Check for second digit (e.g., "18P")
+                if let Some(&next) = chars.peek() {
+                    if next.is_ascii_digit() {
+                        count = count * 10 + chars.next().unwrap().to_digit(10).unwrap() as u8;
+                    }
+                }
+                // Now get the piece character
+                let piece_char = chars.next().ok_or(SfenParseError::InvalidFormat)?;
+                Self::add_hand_piece(&mut hands, piece_char, count)?;
+            } else {
+                Self::add_hand_piece(&mut hands, c, count)?;
+            }
+        }
+
+        Ok(hands)
+    }
+
+    fn add_hand_piece(hands: &mut [Hand; 2], c: char, count: u8) -> Result<(), SfenParseError> {
+        let is_black = c.is_ascii_uppercase();
+        let color_idx = if is_black { 0 } else { 1 };
+
+        let kind_idx = match c.to_ascii_uppercase() {
+            'P' => 0,
+            'L' => 1,
+            'N' => 2,
+            'S' => 3,
+            'B' => 4,
+            'R' => 5,
+            'G' => 6,
+            _ => return Err(SfenParseError::InvalidHandPiece(c)),
+        };
+
+        hands[color_idx].0[kind_idx] += count;
+        Ok(())
+    }
+
     pub fn board(&self) -> &[Option<Piece>; 81] {
         &self.board
     }
@@ -522,6 +683,35 @@ impl Position {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_from_sfen_startpos() {
+        let sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
+        let position = Position::from_sfen(sfen).unwrap();
+        assert_eq!(position.to_sfen_owned(), sfen);
+    }
+
+    #[test]
+    fn test_from_sfen_with_hands() {
+        let sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b 2P2p 1";
+        let position = Position::from_sfen(sfen).unwrap();
+        assert_eq!(position.to_sfen_owned(), sfen);
+    }
+
+    #[test]
+    fn test_from_sfen_with_promoted() {
+        let sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1+B5R1/LNSGKGSNL w - 10";
+        let position = Position::from_sfen(sfen).unwrap();
+        assert_eq!(position.to_sfen_owned(), sfen);
+    }
+
+    #[test]
+    fn test_from_sfen_roundtrip() {
+        let original = Position::startpos();
+        let sfen = original.to_sfen_owned();
+        let parsed = Position::from_sfen(&sfen).unwrap();
+        assert_eq!(original, parsed);
+    }
 
     #[test]
     fn test_position_to_sfen() {

@@ -5,4 +5,4 @@ mod pext;
 mod position;
 
 pub use packer::{Packer, SSPFv1};
-pub use position::{Bitboard, Color, Hand, Piece, PieceKind, Position, Square};
+pub use position::{Bitboard, Color, Hand, Piece, PieceKind, Position, SfenParseError, Square};
