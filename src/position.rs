@@ -18,6 +18,15 @@ impl Bitboard {
     pub fn bitnot_raw(self) -> Bitboard {
         Bitboard(!self.0, !self.1)
     }
+
+    pub fn from_square(square: Square) -> Self {
+        let square = square.0 as i32;
+        if square < 63 {
+            Bitboard(1u64 << square, 0)
+        } else {
+            Bitboard(0, 1u64 << (square - 63))
+        }
+    }
 }
 
 impl BitAnd for Bitboard {
@@ -66,7 +75,7 @@ impl Color {
         }
     }
 
-    fn from_index(index: usize) -> Self {
+    pub fn from_index(index: usize) -> Self {
         unsafe { std::mem::transmute(index as u8) }
     }
 }
