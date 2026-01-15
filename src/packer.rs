@@ -101,11 +101,12 @@ impl SSPFv1 {
         );
         let occupied_low_bits = (!king_bb.0 & 0x7FFF_FFFF_FFFF_FFFF).count_ones();
         let occupied_without_kings_compact_lower =
-            (occupied_lower | (occupied_upper).wrapping_shl(occupied_low_bits)).wrapping_shl(1);
+            occupied_lower | (occupied_upper).wrapping_shl(occupied_low_bits);
         let occupied_without_kings_compact_upper =
             (occupied_upper).wrapping_shr(63 - occupied_low_bits);
 
-        tmp[0] = occupied_without_kings_compact_lower | position.side_to_move() as u64;
+        tmp[0] =
+            occupied_without_kings_compact_lower.wrapping_shl(1) | position.side_to_move() as u64;
         tmp[1] = occupied_without_kings_compact_upper
             | black_king_pos.wrapping_shl(16)
             | white_king_pos.wrapping_shl(23)
