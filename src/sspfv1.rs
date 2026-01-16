@@ -90,7 +90,7 @@ impl SSPFv1 {
         let bit3_mask = bishop_bits | rook_bits | gold_bits;
         let bit1 = silver_bits | bit3_mask;
         let bit2 = knight_bits | bit3_mask;
-        let [occupied_lower, occupied_upper, bit3, bit4] = pext_u64x4(
+        let [occupied_lower, occupied_upper, bit3, bit4] = pext_u64x4::<8>(
             [occupied.0, occupied.1, bishop_bits | rook_bits, rook_bits],
             [!king_bb.0, !king_bb.1, bit3_mask, bishop_bits | rook_bits],
         );

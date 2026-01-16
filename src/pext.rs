@@ -25,7 +25,7 @@ pub fn pext_u64(data: u64, mut mask: u64) -> u64 {
 
 #[cfg(any(target_feature = "bmi2", not(target_feature = "avx2")))]
 #[inline(always)]
-pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
+pub fn pext_u64x4<const ENABLE_BYTES: usize>(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
     [
         pext_u64(data[0], mask[0]),
         pext_u64(data[1], mask[1]),
@@ -36,7 +36,7 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
 
 #[cfg(all(not(target_feature = "bmi2"), target_feature = "avx2"))]
 #[inline(always)]
-pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
+pub fn pext_u64x4<const ENABLE_BYTES: usize>(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
     use std::arch::x86_64::*;
     unsafe {
         let data_vec = _mm256_loadu_si256(data.as_ptr() as *const __m256i);
@@ -75,7 +75,7 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
         };
         let mut result_vec = _mm256_setzero_si256();
         let low_byte_mask = _mm256_set1_epi64x(0xFF);
-        for _ in 0..8 {
+        for _ in 0..ENABLE_BYTES {
             let group_vec = _mm256_and_si256(data_vec, low_byte_mask);
             let shifted_vec =
                 _mm256_sllv_epi64(group_vec, _mm256_and_si256(shift_vec, low_byte_mask));
@@ -91,12 +91,12 @@ pub fn pext_u64x4(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
 
 #[inline(always)]
 pub fn pext_board_lower_u64x4(data: [Bitboard; 4], mask: [Bitboard; 4]) -> [u64; 4] {
-    let bits0 = pext_u64x4(
+    let bits0 = pext_u64x4::<8>(
         [data[0].0, data[1].0, data[2].0, data[3].0],
         [mask[0].0, mask[1].0, mask[2].0, mask[3].0],
     );
     // Since PEXT for the upper bits has only 18 bits set at most, it is expected to finish quickly.
-    let bits1 = pext_u64x4(
+    let bits1 = pext_u64x4::<3>(
         [data[0].1, data[1].1, data[2].1, data[3].1],
         [mask[0].1, mask[1].1, mask[2].1, mask[3].1],
     );
@@ -145,7 +145,7 @@ mod tests {
             0x0000_0000_9CF2_147Au64,
             0x0000_0A60_4E4E_F0DFu64,
         ];
-        let result = pext_u64x4(data, mask);
+        let result = pext_u64x4::<8>(data, mask);
         assert_eq!(result, expected);
     }
 
