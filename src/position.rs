@@ -394,7 +394,7 @@ impl Position {
             let mut vacant = 0;
             for j in 0..9 {
                 // Safety: the index is in range 0..81.
-                let current = &self.at(Square((i * 9 + j) as u8));
+                let current = &self.at(Square(((8 - j) * 9 + i) as u8));
                 if let Some(occupying) = current {
                     if vacant > 0 {
                         write!(sink, "{}", vacant)?;
