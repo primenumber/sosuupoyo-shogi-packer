@@ -145,6 +145,20 @@ impl PackedSfen {
         let (bits, length) = HUFFMAN_TABLE[kind_index + 1];
         writer.write_n_bit(bits, length - 1); // -1 to remove empty branch
         writer.write_one_bit(color_bit);
+        match PieceKind::from_index(kind_index) {
+            PieceKind::Pawn
+            | PieceKind::Lance
+            | PieceKind::Knight
+            | PieceKind::Silver
+            | PieceKind::Bishop
+            | PieceKind::Rook => {
+                writer.write_one_bit(0); // all hand pieces are unpromoted
+            }
+            PieceKind::Gold => {}
+            _ => {
+                unreachable!("Invalid piece kind")
+            }
+        }
     }
 
     /// Read a hand piece from the bit stream using compact Huffman encoding.
@@ -158,6 +172,7 @@ impl PackedSfen {
         // 0 = pawn
         if reader.read_one_bit() == 0 {
             let color = Color::from_index(reader.read_one_bit() as usize);
+            reader.read_one_bit(); // promoted bit (always 0 for hand pieces)
             return Some((PieceKind::Pawn, color));
         }
 
@@ -168,6 +183,7 @@ impl PackedSfen {
 
         // 10x = lance/knight
         if reader.read_one_bit() == 0 {
+            reader.read_one_bit(); // promoted bit (always 0 for hand pieces)
             if reader.read_one_bit() == 0 {
                 // 100 = lance
                 let color = Color::from_index(reader.read_one_bit() as usize);
@@ -181,6 +197,7 @@ impl PackedSfen {
 
         // 110 = silver
         if reader.read_one_bit() == 0 {
+            reader.read_one_bit(); // promoted bit (always 0 for hand pieces)
             let color = Color::from_index(reader.read_one_bit() as usize);
             return Some((PieceKind::Silver, color));
         }
@@ -203,11 +220,13 @@ impl PackedSfen {
 
         // 11110 = bishop, 11111 = rook
         if reader.read_one_bit() == 0 {
+            reader.read_one_bit(); // promoted bit (always 0 for hand pieces)
             let color = Color::from_index(reader.read_one_bit() as usize);
             return Some((PieceKind::Bishop, color));
         }
 
         // 11111 = rook
+        reader.read_one_bit(); // promoted bit (always 0 for hand pieces)
         let color = Color::from_index(reader.read_one_bit() as usize);
         Some((PieceKind::Rook, color))
     }
