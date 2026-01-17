@@ -466,45 +466,22 @@ mod tests {
     use test::Bencher;
 
     #[test]
-    fn test_pack_unpack_startpos() {
-        let position = Position::startpos();
-        let mut buffer = [0u8; BUFFER_SIZE];
+    fn test_pack_unpack_roundtrip() {
+        let sfens = [
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+            "3k3nl/G3n2r1/P1P+LB+B1p1/1G2ppp1p/KP1P1P1P1/p2sP1P1P/5SN2/4G4/L+R6L w 2Ppn2SG 1",
+        ];
+        for sfen in sfens.iter() {
+            let position = Position::from_sfen(sfen).unwrap();
+            let mut buffer = [0u8; BUFFER_SIZE];
 
-        PackedSfen.pack(&position, &mut buffer).unwrap();
+            PackedSfen.pack(&position, &mut buffer).unwrap();
 
-        let mut unpacked = Position::startpos();
-        PackedSfen.unpack(&buffer, &mut unpacked).unwrap();
+            let mut unpacked = Position::startpos();
+            PackedSfen.unpack(&buffer, &mut unpacked).unwrap();
 
-        assert_eq!(unpacked.to_sfen_owned(), position.to_sfen_owned());
-    }
-
-    #[test]
-    fn test_pack_unpack_with_hands() {
-        let sfen = "lnsgkgsnl/1r5b1/pppp1pppp/4p4/9/4P4/PPPP1PPPP/1B5R1/LNSGKGSNL w - 3";
-        let position = Position::from_sfen(sfen).unwrap();
-        let mut buffer = [0u8; BUFFER_SIZE];
-
-        PackedSfen.pack(&position, &mut buffer).unwrap();
-
-        let mut unpacked = Position::startpos();
-        PackedSfen.unpack(&buffer, &mut unpacked).unwrap();
-
-        assert_eq!(unpacked.side_to_move(), position.side_to_move());
-        assert_eq!(unpacked.board(), position.board());
-    }
-
-    #[test]
-    fn test_pack_unpack_with_promoted_pieces() {
-        let sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1+B5+R1/LNSGKGSNL b - 1";
-        let position = Position::from_sfen(sfen).unwrap();
-        let mut buffer = [0u8; BUFFER_SIZE];
-
-        PackedSfen.pack(&position, &mut buffer).unwrap();
-
-        let mut unpacked = Position::startpos();
-        PackedSfen.unpack(&buffer, &mut unpacked).unwrap();
-
-        assert_eq!(unpacked.to_sfen_owned(), position.to_sfen_owned());
+            assert_eq!(unpacked, position);
+        }
     }
 
     #[test]
@@ -526,8 +503,7 @@ mod tests {
         let mut unpacked = Position::startpos();
         PackedSfen.unpack(&buffer, &mut unpacked).unwrap();
 
-        assert_eq!(unpacked.board(), position.board());
-        assert_eq!(unpacked.side_to_move(), position.side_to_move());
+        assert_eq!(unpacked, position);
     }
 
     #[test]
