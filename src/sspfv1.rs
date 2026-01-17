@@ -283,76 +283,21 @@ mod tests {
 
     #[test]
     fn test_pack_unpack_roundtrip() {
-        let position = Position::startpos();
-        let mut buffer = [0u8; BUFFER_SIZE];
-
-        SSPFv1().pack(&position, &mut buffer).unwrap();
-
-        let mut unpacked = Position::startpos();
-        SSPFv1().unpack(&buffer, &mut unpacked).unwrap();
-
-        assert_eq!(unpacked, position);
-    }
-
-    #[test]
-    fn test_pack_unpack_roundtrip_with_hands() {
-        let position = Position::startpos();
-        let mut board = position.board().clone();
-        board[10] = None; // Remove White's Bishop from the board
-        board[16] = None; // Remove Black's Rook from the board
-        board[64] = None; // Remove White's Rook from the board
-        board[70] = None; // Remove Black's Bishop from the board
-
-        // Black has: Bishop, Rook
-        // White has: Bishop, Rook
-        let hands = [
-            Hand([0, 0, 0, 0, 1, 1, 0, 0]), // Black: 1 Bishop, 1 Rook
-            Hand([0, 0, 0, 0, 1, 1, 0, 0]), // White: 1 Bishop, 1 Rook
+        let sfens = [
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+            "lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/9/LNSGKGSNL b BRbr 1",
+            "3k3nl/G3n2r1/P1P+LB+B1p1/1G2ppp1p/KP1P1P1P1/p2sP1P1P/5SN2/4G4/L+R6L w 2Ppn2SG 1",
         ];
-        let position = Position::new(board, hands, Color::Black, 1);
+        for sfen in sfens.iter() {
+            let position = Position::from_sfen(sfen).unwrap();
+            let mut buffer = [0u8; BUFFER_SIZE];
 
-        let mut buffer = [0u8; BUFFER_SIZE];
-        SSPFv1().pack(&position, &mut buffer).unwrap();
+            SSPFv1().pack(&position, &mut buffer).unwrap();
 
-        let mut unpacked = Position::set_only_kings();
-        SSPFv1().unpack(&buffer, &mut unpacked).unwrap();
+            let mut unpacked = Position::startpos();
+            SSPFv1().unpack(&buffer, &mut unpacked).unwrap();
 
-        // Verify side_to_move
-        assert_eq!(
-            unpacked.side_to_move() as u8,
-            position.side_to_move() as u8,
-            "side_to_move mismatch"
-        );
-
-        // Verify hands
-        assert_eq!(
-            unpacked.hand(Color::Black).0,
-            position.hand(Color::Black).0,
-            "black hand mismatch"
-        );
-        assert_eq!(
-            unpacked.hand(Color::White).0,
-            position.hand(Color::White).0,
-            "white hand mismatch"
-        );
-
-        // Verify piece bitboards
-        for kind in [
-            PieceKind::Pawn,
-            PieceKind::Lance,
-            PieceKind::Knight,
-            PieceKind::Silver,
-            PieceKind::Bishop,
-            PieceKind::Rook,
-            PieceKind::Gold,
-            PieceKind::King,
-        ] {
-            assert_eq!(
-                unpacked.piece_kind_bitboard(kind),
-                position.piece_kind_bitboard(kind),
-                "{:?} bitboard mismatch",
-                kind
-            );
+            assert_eq!(unpacked, position);
         }
     }
 
