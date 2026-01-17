@@ -53,10 +53,10 @@ pub fn pext_u64x4<const ENABLE_BYTES: usize>(data: [u64; 4], mask: [u64; 4]) -> 
             let mask_zero_mask = _mm256_cmpeq_epi8(lsb_vec, _mm256_setzero_si256());
             let cmp = _mm256_cmpeq_epi8(data_and_lsb, _mm256_setzero_si256());
             result_vec = _mm256_or_si256(result_vec, _mm256_andnot_si256(cmp, pos_bit_vec));
-            pos_bit_vec = _mm256_slli_epi64(pos_bit_vec, 1);
+            pos_bit_vec = _mm256_add_epi8(pos_bit_vec, pos_bit_vec);
             block_mask_vec = _mm256_or_si256(
                 block_mask_vec,
-                _mm256_blendv_epi8(pos_bit_vec, _mm256_setzero_si256(), mask_zero_mask),
+                _mm256_andnot_si256(mask_zero_mask, pos_bit_vec),
             );
             mask_vec = _mm256_xor_si256(mask_vec, lsb_vec);
             popcnt_vec = _mm256_add_epi8(
