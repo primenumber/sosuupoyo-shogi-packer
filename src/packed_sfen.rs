@@ -515,35 +515,36 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_decode_piece_roundtrip() {
-        let pieces = [
-            None,
-            Some(Piece::new(Color::Black, PieceKind::Pawn)),
-            Some(Piece::new(Color::White, PieceKind::Pawn)),
-            Some(Piece::new(Color::Black, PieceKind::ProPawn)),
-            Some(Piece::new(Color::Black, PieceKind::Lance)),
-            Some(Piece::new(Color::White, PieceKind::ProLance)),
-            Some(Piece::new(Color::Black, PieceKind::Knight)),
-            Some(Piece::new(Color::White, PieceKind::ProKnight)),
-            Some(Piece::new(Color::Black, PieceKind::Silver)),
-            Some(Piece::new(Color::White, PieceKind::ProSilver)),
-            Some(Piece::new(Color::Black, PieceKind::Gold)),
-            Some(Piece::new(Color::White, PieceKind::Gold)),
-            Some(Piece::new(Color::Black, PieceKind::Bishop)),
-            Some(Piece::new(Color::White, PieceKind::ProBishop)),
-            Some(Piece::new(Color::Black, PieceKind::Rook)),
-            Some(Piece::new(Color::White, PieceKind::ProRook)),
-        ];
+    fn test_encode_decode_empty() {
+        let mut buffer = [0u8; 4];
+        {
+            let mut writer = BitWriter::new(&mut buffer);
+            PackedSfen::write_piece(&mut writer, None);
+        }
+        let mut reader = BitReader::new(&buffer);
+        let decoded = PackedSfen::read_piece(&mut reader);
+        assert_eq!(decoded, None);
+    }
 
-        for piece in pieces {
-            let mut buffer = [0u8; 4];
-            {
-                let mut writer = BitWriter::new(&mut buffer);
-                PackedSfen::write_piece(&mut writer, piece);
+    #[test]
+    fn test_encode_decode_piece_roundtrip() {
+        for kind in 0..14 {
+            let kind = PieceKind::from_index(kind);
+            if kind == PieceKind::King {
+                continue; // Skip king
             }
-            let mut reader = BitReader::new(&buffer);
-            let decoded = PackedSfen::read_piece(&mut reader);
-            assert_eq!(decoded, piece, "Failed for piece {:?}", piece);
+            for color in 0..2 {
+                let color = Color::from_index(color);
+                let piece = Some(Piece::new(color, kind));
+                let mut buffer = [0u8; 4];
+                {
+                    let mut writer = BitWriter::new(&mut buffer);
+                    PackedSfen::write_piece(&mut writer, piece);
+                }
+                let mut reader = BitReader::new(&buffer);
+                let decoded = PackedSfen::read_piece(&mut reader);
+                assert_eq!(decoded, piece, "Failed for piece {:?}", piece);
+            }
         }
     }
 
