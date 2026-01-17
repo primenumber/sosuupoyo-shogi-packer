@@ -29,7 +29,7 @@
 //! Terminator: all remaining bits are 0 (no more pieces when all-zero pattern detected)
 
 use crate::packer::{Packer, BUFFER_SIZE};
-use crate::{Color, Hand, Piece, PieceKind, Position};
+use crate::{Color, Hand, Piece, PieceKind, Position, Square};
 
 pub struct PackedSfen;
 
@@ -322,7 +322,6 @@ impl PackedSfen {
 impl Packer for PackedSfen {
     fn pack(&self, position: &Position, buffer: &mut [u8; BUFFER_SIZE]) -> Option<()> {
         let mut writer = BitWriter::new(buffer);
-        let board = position.board();
 
         // Side to move (1 bit)
         writer.write_one_bit(position.side_to_move() as u32);
@@ -341,7 +340,7 @@ impl Packer for PackedSfen {
             if sq == black_king_sq || sq == white_king_sq {
                 continue;
             }
-            Self::write_piece(&mut writer, board[sq]);
+            Self::write_piece(&mut writer, position.at(Square(sq as u8)));
         }
 
         // Hand pieces: Huffman encoded
