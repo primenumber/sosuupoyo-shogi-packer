@@ -565,15 +565,13 @@ impl Position {
     }
 
     pub fn occupied_bitboard(&self) -> Bitboard {
-        let mut bb = Bitboard(0, 0);
-        for piece_bb in &self.piece_bb {
-            bb.0 |= piece_bb.0;
-            bb.1 |= piece_bb.1;
-        }
-        bb
+        self.player_bb[0] | self.player_bb[1]
     }
 
     pub fn at(&self, square: Square) -> Option<Piece> {
+        if !self.occupied_bitboard().at(square) {
+            return None;
+        }
         for (i, bb) in self.piece_bb.iter().enumerate() {
             if bb.at(square) {
                 let color = if self.player_bb[0].at(square) {
