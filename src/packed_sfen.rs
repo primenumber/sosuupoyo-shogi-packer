@@ -119,20 +119,10 @@ impl PackedSfen {
                 // +1 to skip empty
                 writer.write_n_bit(bits, length);
                 writer.write_one_bit(color_bit);
-                match PieceKind::from_index(raw_kind_index) {
-                    PieceKind::Pawn
-                    | PieceKind::Lance
-                    | PieceKind::Knight
-                    | PieceKind::Silver
-                    | PieceKind::Bishop
-                    | PieceKind::Rook => {
-                        writer.write_one_bit(if is_promoted { 1 } else { 0 });
-                    }
-                    PieceKind::Gold => {}
-                    _ => {
-                        unreachable!("Invalid piece kind")
-                    }
+                if kind == PieceKind::Gold {
+                    return; // Gold has no promoted bit
                 }
+                writer.write_one_bit(if is_promoted { 1 } else { 0 });
             }
         }
     }
@@ -145,20 +135,10 @@ impl PackedSfen {
         let (bits, length) = HUFFMAN_TABLE[kind_index + 1];
         writer.write_n_bit(bits >> 1, length - 1); // -1 to remove empty branch
         writer.write_one_bit(color_bit);
-        match PieceKind::from_index(kind_index) {
-            PieceKind::Pawn
-            | PieceKind::Lance
-            | PieceKind::Knight
-            | PieceKind::Silver
-            | PieceKind::Bishop
-            | PieceKind::Rook => {
-                writer.write_one_bit(0); // all hand pieces are unpromoted
-            }
-            PieceKind::Gold => {}
-            _ => {
-                unreachable!("Invalid piece kind")
-            }
+        if kind == PieceKind::Gold {
+            return; // Gold has no promoted bit
         }
+        writer.write_one_bit(0); // all hand pieces are unpromoted
     }
 
     /// Read a hand piece from the bit stream using compact Huffman encoding.
