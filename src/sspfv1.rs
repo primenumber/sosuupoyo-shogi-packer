@@ -3,7 +3,7 @@ use crate::pdep::{pdep_board, pdep_board_lower_u64};
 use crate::pext::{pext_board_lower_u64x4, pext_u64x4};
 use crate::{Bitboard, Color, Hand, PieceKind, Position, Square};
 
-pub struct SSPFv1();
+pub struct SSPFv1;
 
 impl SSPFv1 {
     fn pack_hands(hand_black: &Hand, hand_white: &Hand) -> u64 {
@@ -292,10 +292,10 @@ mod tests {
             let position = Position::from_sfen(sfen).unwrap();
             let mut buffer = [0u8; BUFFER_SIZE];
 
-            SSPFv1().pack(&position, &mut buffer).unwrap();
+            SSPFv1.pack(&position, &mut buffer).unwrap();
 
             let mut unpacked = Position::startpos();
-            SSPFv1().unpack(&buffer, &mut unpacked).unwrap();
+            SSPFv1.unpack(&buffer, &mut unpacked).unwrap();
 
             assert_eq!(unpacked, position);
         }
@@ -307,7 +307,7 @@ mod tests {
         let mut buffer = [0u8; BUFFER_SIZE];
         let mut sum = 0;
         b.iter(|| {
-            SSPFv1().pack(&position, &mut buffer).unwrap();
+            SSPFv1.pack(&position, &mut buffer).unwrap();
             // Prevent optimization
             for byte in buffer.iter() {
                 sum += *byte as usize;
@@ -320,12 +320,12 @@ mod tests {
     fn bench_unpack(b: &mut Bencher) {
         let position = Position::startpos();
         let mut buffer = [0u8; BUFFER_SIZE];
-        SSPFv1().pack(&position, &mut buffer).unwrap();
+        SSPFv1.pack(&position, &mut buffer).unwrap();
 
         let mut unpacked = Position::set_only_kings();
         let mut sum = 0;
         b.iter(|| {
-            SSPFv1().unpack(&buffer, &mut unpacked).unwrap();
+            SSPFv1.unpack(&buffer, &mut unpacked).unwrap();
             // Prevent optimization
             sum += unpacked.king_square(Color::Black).0 as usize;
         });
