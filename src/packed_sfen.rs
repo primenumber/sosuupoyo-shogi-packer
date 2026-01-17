@@ -396,16 +396,7 @@ impl Packer for PackedSfen {
         let mut board_piece_counts = [0u8; 8];
         for sq in 0..81 {
             if let Some(piece) = board[sq] {
-                let base_idx = match piece.kind() {
-                    PieceKind::Pawn | PieceKind::ProPawn => PieceKind::Pawn.index(),
-                    PieceKind::Lance | PieceKind::ProLance => PieceKind::Lance.index(),
-                    PieceKind::Knight | PieceKind::ProKnight => PieceKind::Knight.index(),
-                    PieceKind::Silver | PieceKind::ProSilver => PieceKind::Silver.index(),
-                    PieceKind::Gold => PieceKind::Gold.index(),
-                    PieceKind::Bishop | PieceKind::ProBishop => PieceKind::Bishop.index(),
-                    PieceKind::Rook | PieceKind::ProRook => PieceKind::Rook.index(),
-                    PieceKind::King => continue,
-                };
+                let base_idx = piece.kind().index() & 0x7; // Remove promoted flag
                 board_piece_counts[base_idx] += 1;
             }
         }
