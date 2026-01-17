@@ -54,8 +54,8 @@ impl<'a> BitWriter<'a> {
 
     fn write_one_bit(&mut self, value: u32) {
         if value != 0 {
-            let byte_pos = self.cursor / 8;
-            let bit_pos = self.cursor % 8;
+            let byte_pos = self.cursor >> 3;
+            let bit_pos = self.cursor & 7;
             self.buffer[byte_pos as usize] |= 1 << bit_pos;
         }
         self.cursor += 1;
@@ -82,8 +82,8 @@ impl<'a> BitReader<'a> {
     }
 
     fn read_one_bit(&mut self) -> u32 {
-        let byte_pos = self.cursor / 8;
-        let bit_pos = self.cursor % 8;
+        let byte_pos = self.cursor >> 3;
+        let bit_pos = self.cursor & 7;
         let bit = ((self.buffer[byte_pos as usize] >> bit_pos) & 1) as u32;
         self.cursor += 1;
         bit
