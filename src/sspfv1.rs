@@ -172,7 +172,7 @@ impl Packer for SSPFv1 {
         let bit1 = (tmp[2] >> 38) & 0xF_FFFF;
         let bit2_lower = (tmp[2] >> 58) & 0x3F;
         let bit2_upper = tmp[3] & 0x3FFF;
-        let bit2 = bit2_lower | (bit2_upper << 6);
+        let bit2 = bit2_lower | bit2_upper.wrapping_shl(6);
         let bit3 = (tmp[3] >> 14) & 0xFF;
         let bit4 = (tmp[3] >> 22) & 0xF;
         let color_bits = tmp[3] >> 26;
@@ -214,7 +214,7 @@ impl Packer for SSPFv1 {
         let hand_bits_offset = occupied_without_kings_compact_lower.count_ones()
             + occupied_without_kings_compact_upper.count_ones();
         let hand_color_bits = color_bits >> hand_bits_offset;
-        let board_color_bits = color_bits ^ (hand_color_bits << hand_bits_offset);
+        let board_color_bits = color_bits ^ hand_color_bits.wrapping_shl(hand_bits_offset);
         let color_bb = pdep_board_lower_u64(board_color_bits, occupied_without_kings_bb)
             | Bitboard::from_square(white_king_pos);
         // Reconstruct position

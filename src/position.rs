@@ -29,20 +29,20 @@ impl Bitboard {
     }
 
     pub fn from_square(square: Square) -> Self {
-        let square = square.0 as i32;
+        let square = square.0 as u32;
         if square < 63 {
-            Bitboard(1u64 << square, 0)
+            Bitboard(1u64.wrapping_shl(square), 0)
         } else {
-            Bitboard(0, 1u64 << (square - 63))
+            Bitboard(0, 1u64.wrapping_shl(square - 63))
         }
     }
 
     pub fn at(&self, square: Square) -> bool {
-        let square = square.0 as i32;
+        let square = square.0 as u32;
         if square < 63 {
-            (self.0 & (1u64 << square)) != 0
+            (self.0 & 1u64.wrapping_shl(square)) != 0
         } else {
-            (self.1 & (1u64 << (square - 63))) != 0
+            (self.1 & (1u64.wrapping_shl(square - 63))) != 0
         }
     }
 
@@ -216,7 +216,7 @@ impl Piece {
         let kind_index = kind.index() as u8;
         let color_index = color.index() as u8;
         Piece {
-            value: kind_index | (color_index << 4),
+            value: kind_index | color_index.wrapping_shl(4),
         }
     }
 
