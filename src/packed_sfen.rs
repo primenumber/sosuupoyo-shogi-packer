@@ -35,28 +35,34 @@ pub struct PackedSfen;
 
 /// Bit stream writer for packing
 struct BitWriter<'a> {
-    buffer: &'a mut [u8],
+    buffer: &'a mut [u64],
     cursor: u32, // bit position
 }
 
 impl<'a> BitWriter<'a> {
-    fn new(buffer: &'a mut [u8]) -> Self {
+    fn new(buffer: &'a mut [u64]) -> Self {
         buffer.fill(0);
         Self { buffer, cursor: 0 }
     }
 
-    fn write_n_bit(&mut self, value: u32, num_bits: u32) {
-        for i in 0..num_bits {
-            let bit = (value >> i) & 1;
-            self.write_one_bit(bit);
+    fn write_n_bit(&mut self, mut value: u64, mut num_bits: u32) {
+        while num_bits > 0 {
+            let word_pos = self.cursor >> 6;
+            let bit_pos = self.cursor & 63;
+            unsafe { *self.buffer.get_unchecked_mut(word_pos as usize) |= value << bit_pos };
+            let bits_in_current_word = 64 - bit_pos;
+            let bits_written = bits_in_current_word.min(num_bits);
+            self.cursor += bits_written;
+            num_bits -= bits_written;
+            value >>= bits_written;
         }
     }
 
-    fn write_one_bit(&mut self, value: u32) {
+    fn write_one_bit(&mut self, value: u64) {
         if value != 0 {
-            let byte_pos = self.cursor >> 3;
-            let bit_pos = self.cursor & 7;
-            unsafe { *self.buffer.get_unchecked_mut(byte_pos as usize) |= 1 << bit_pos };
+            let word_pos = self.cursor >> 6;
+            let bit_pos = self.cursor & 63;
+            unsafe { *self.buffer.get_unchecked_mut(word_pos as usize) |= 1 << bit_pos };
         }
         self.cursor += 1;
     }
@@ -64,34 +70,34 @@ impl<'a> BitWriter<'a> {
 
 /// Bit stream reader for unpacking
 struct BitReader<'a> {
-    buffer: &'a [u8],
+    buffer: &'a [u64],
     cursor: u32, // bit position
 }
 
 impl<'a> BitReader<'a> {
-    fn new(buffer: &'a [u8]) -> Self {
+    fn new(buffer: &'a [u64]) -> Self {
         Self { buffer, cursor: 0 }
     }
 
-    fn read_n_bit(&mut self, num_bits: u32) -> u32 {
-        let mut result = 0u32;
+    fn read_n_bit(&mut self, num_bits: u32) -> u64 {
+        let mut result = 0u64;
         for i in 0..num_bits {
             result |= if self.read_one_bit() != 0 { 1 << i } else { 0 };
         }
         result
     }
 
-    fn read_one_bit(&mut self) -> u32 {
-        let byte_pos = self.cursor >> 3;
-        let bit_pos = self.cursor & 7;
+    fn read_one_bit(&mut self) -> u64 {
+        let word_pos = self.cursor >> 6;
+        let bit_pos = self.cursor & 63;
         let bit =
-            ((unsafe { *self.buffer.get_unchecked(byte_pos as usize) } >> bit_pos) & 1) as u32;
+            ((unsafe { *self.buffer.get_unchecked(word_pos as usize) } >> bit_pos) & 1) as u64;
         self.cursor += 1;
         bit
     }
 }
 
-const HUFFMAN_TABLE: [(u32, u32); 8] = [
+const HUFFMAN_TABLE: [(u64, u32); 8] = [
     // (bit pattern as u32, number of bits)
     (0b0, 1),      // Empty
     (0b01, 2),     // Pawn
@@ -111,7 +117,7 @@ impl PackedSfen {
                 writer.write_one_bit(0); // Empty: 0
             }
             Some(p) => {
-                let color_bit = p.color() as u32;
+                let color_bit = p.color() as u64;
                 let kind = p.kind();
                 let is_promoted = kind.index() >= PieceKind::ProPawn.index();
 
@@ -131,7 +137,7 @@ impl PackedSfen {
     /// Write a hand piece to the bit stream using compact Huffman encoding.
     /// Compact encoding removes the "empty square" branch, saving 1 bit per piece.
     fn write_hand_piece(writer: &mut BitWriter, kind: PieceKind, color: Color) {
-        let color_bit = color as u32;
+        let color_bit = color as u64;
         let kind_index = kind.index();
         let (bits, length) = unsafe { *HUFFMAN_TABLE.get_unchecked(kind_index + 1) };
         writer.write_n_bit(bits >> 1, length - 1); // -1 to remove empty branch
@@ -302,18 +308,19 @@ impl PackedSfen {
 
 impl Packer for PackedSfen {
     fn pack(&self, position: &Position, buffer: &mut [u8; BUFFER_SIZE]) -> Option<()> {
-        let mut writer = BitWriter::new(buffer);
+        let mut tmp = [0u64; 4];
+        let mut writer = BitWriter::new(&mut tmp);
 
         // Side to move (1 bit)
-        writer.write_one_bit(position.side_to_move() as u32);
+        writer.write_one_bit(position.side_to_move() as u64);
 
         // Get king positions
         let black_king_sq = position.king_square(Color::Black).0 as usize;
         let white_king_sq = position.king_square(Color::White).0 as usize;
 
         // First, encode king positions (7 bits each = 14 bits total)
-        writer.write_n_bit(black_king_sq as u32, 7);
-        writer.write_n_bit(white_king_sq as u32, 7);
+        writer.write_n_bit(black_king_sq as u64, 7);
+        writer.write_n_bit(white_king_sq as u64, 7);
 
         // Encode board (79 squares, skipping king squares)
         for sq in 0..81 {
@@ -346,11 +353,20 @@ impl Packer for PackedSfen {
             }
         }
 
+        // Copy to output buffer
+        for (i, word) in tmp.iter().enumerate() {
+            buffer[(i * 8)..(i * 8 + 8)].copy_from_slice(&word.to_le_bytes());
+        }
+
         Some(())
     }
 
     fn unpack(&self, buffer: &[u8; BUFFER_SIZE], position: &mut Position) -> Option<()> {
-        let mut reader = BitReader::new(buffer);
+        let mut tmp = [0u64; 4];
+        for i in 0..4 {
+            tmp[i] = u64::from_le_bytes(buffer[(i * 8)..(i * 8 + 8)].try_into().unwrap());
+        }
+        let mut reader = BitReader::new(&tmp);
 
         // Side to move
         let side_to_move = Color::from_index(reader.read_one_bit() as usize);
@@ -480,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_bit_writer_reader_roundtrip() {
-        let mut buffer = [0u8; 32];
+        let mut buffer = [0u64; 4];
         {
             let mut writer = BitWriter::new(&mut buffer);
             writer.write_n_bit(0b101, 3);
@@ -498,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_empty() {
-        let mut buffer = [0u8; 4];
+        let mut buffer = [0u64; 1];
         {
             let mut writer = BitWriter::new(&mut buffer);
             PackedSfen::write_piece(&mut writer, OptionPiece::none());
@@ -518,7 +534,7 @@ mod tests {
             for color in 0..2 {
                 let color = Color::from_index(color);
                 let piece = OptionPiece::some(Piece::new(color, kind));
-                let mut buffer = [0u8; 4];
+                let mut buffer = [0u64; 1];
                 {
                     let mut writer = BitWriter::new(&mut buffer);
                     PackedSfen::write_piece(&mut writer, piece);
