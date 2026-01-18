@@ -115,10 +115,7 @@ pub enum Color {
 impl Color {
     #[inline(always)]
     const fn index(&self) -> usize {
-        match self {
-            Color::Black => 0,
-            Color::White => 1,
-        }
+        *self as usize
     }
 
     #[inline(always)]
