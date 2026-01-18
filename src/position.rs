@@ -40,6 +40,11 @@ impl Bitboard {
     }
 
     #[inline(always)]
+    pub fn any(&self) -> bool {
+        self.0 != 0 || self.1 != 0
+    }
+
+    #[inline(always)]
     pub fn at(&self, square: Square) -> bool {
         let square = square.0 as u32;
         if square < 63 {
