@@ -303,6 +303,48 @@ impl ToUsi for Piece {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OptionPiece {
+    value: u8,
+}
+
+impl OptionPiece {
+    #[inline(always)]
+    pub const fn some(piece: Piece) -> Self {
+        OptionPiece { value: piece.value }
+    }
+
+    #[inline(always)]
+    pub const fn none() -> Self {
+        OptionPiece { value: 0xFF }
+    }
+
+    #[inline(always)]
+    pub fn is_some(&self) -> bool {
+        self.value != 0xFF
+    }
+
+    #[inline(always)]
+    pub fn is_none(&self) -> bool {
+        self.value == 0xFF
+    }
+
+    #[inline(always)]
+    pub fn unwrap(&self) -> Piece {
+        assert!(self.is_some());
+        Piece { value: self.value }
+    }
+
+    #[inline(always)]
+    pub fn to_option(&self) -> Option<Piece> {
+        if self.is_some() {
+            Some(self.unwrap())
+        } else {
+            None
+        }
+    }
+}
+
 // Hand representation: [Pawn, Lance, Knight, Silver, Bishop, Rook, Gold, padding]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(align(8))]
@@ -344,6 +386,7 @@ pub struct Square(pub u8);
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Position {
+    board: [OptionPiece; 81],
     hands: [Hand; 2],
     player_bb: [Bitboard; 2],
     piece_bb: [Bitboard; 14],
@@ -353,17 +396,12 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn new(
-        board: [Option<Piece>; 81],
-        hands: [Hand; 2],
-        side_to_move: Color,
-        ply: u32,
-    ) -> Self {
+    pub fn new(board: [OptionPiece; 81], hands: [Hand; 2], side_to_move: Color, ply: u32) -> Self {
         let mut player_bb = [Bitboard(0, 0); 2];
         let mut piece_bb = [Bitboard(0, 0); 14];
         let mut king_square = [Square(0); 2];
         for (i, square) in board.iter().enumerate() {
-            if let Some(piece) = square {
+            if let Some(piece) = square.to_option() {
                 let color_index = piece.color().index();
                 let kind_index = piece.kind().index();
                 let bit = 1u64.wrapping_shl(i as u32 % 63);
@@ -380,6 +418,7 @@ impl Position {
             }
         }
         Position {
+            board,
             hands,
             player_bb,
             piece_bb,
@@ -395,9 +434,9 @@ impl Position {
     }
 
     pub fn set_only_kings() -> Self {
-        let mut board = [None; 81];
-        board[36] = Some(P_W_KING);
-        board[44] = Some(P_B_KING);
+        let mut board = [OptionPiece::none(); 81];
+        board[36] = OptionPiece::some(P_W_KING);
+        board[44] = OptionPiece::some(P_B_KING);
         // All other pieces are hand pieces
         let hands = [
             Hand([9, 2, 2, 2, 1, 1, 2, 0]),
@@ -412,7 +451,7 @@ impl Position {
             for j in 0..9 {
                 // Safety: the index is in range 0..81.
                 let current = &self.at(Square(((8 - j) * 9 + i) as u8));
-                if let Some(occupying) = current {
+                if let Some(occupying) = current.to_option() {
                     if vacant > 0 {
                         write!(sink, "{}", vacant)?;
                         vacant = 0;
@@ -463,7 +502,7 @@ impl Position {
         let ply_str = parts[3];
 
         // Parse board
-        let mut board = [None; 81];
+        let mut board = [OptionPiece::none(); 81];
         let ranks: Vec<&str> = board_str.split('/').collect();
         if ranks.len() != 9 {
             return Err(SfenParseError::InvalidFormat);
@@ -487,13 +526,13 @@ impl Position {
                     let piece_char = chars.next().ok_or(SfenParseError::InvalidFormat)?;
                     let piece = Piece::from_sfen(piece_char, true)?;
                     let sq = file as usize * 9 + rank_idx;
-                    board[sq] = Some(piece);
+                    board[sq] = OptionPiece::some(piece);
                     file -= 1;
                 } else {
                     // Normal piece
                     let piece = Piece::from_sfen(c, false)?;
                     let sq = file as usize * 9 + rank_idx;
-                    board[sq] = Some(piece);
+                    board[sq] = OptionPiece::some(piece);
                     file -= 1;
                 }
             }
@@ -569,12 +608,8 @@ impl Position {
         Ok(())
     }
 
-    pub fn board(&self) -> [Option<Piece>; 81] {
-        let mut board = [None; 81];
-        for sq in 0..81 {
-            board[sq] = self.at(Square(sq as u8));
-        }
-        board
+    pub fn board(&self) -> [OptionPiece; 81] {
+        self.board
     }
 
     #[inline(always)]
@@ -588,22 +623,8 @@ impl Position {
     }
 
     #[inline(always)]
-    pub fn at(&self, square: Square) -> Option<Piece> {
-        if !self.occupied_bitboard().at(square) {
-            return None;
-        }
-        for (i, bb) in self.piece_bb.iter().enumerate() {
-            if bb.at(square) {
-                let color = if self.player_bb[0].at(square) {
-                    Color::Black
-                } else {
-                    Color::White
-                };
-                let kind = PieceKind::from_index(i);
-                return Some(Piece::new(color, kind));
-            }
-        }
-        None
+    pub fn at(&self, square: Square) -> OptionPiece {
+        self.board[square.0 as usize]
     }
 
     #[inline(always)]
@@ -636,6 +657,23 @@ impl Position {
         side_to_move: Color,
         ply: u32,
     ) -> Self {
+        let mut board = [OptionPiece::none(); 81];
+
+        for (kind_index, bb) in piece_bb.iter().enumerate() {
+            let kind = PieceKind::from_index(kind_index);
+            let mut bb = *bb;
+            while bb.any() {
+                let square = bb.peek().unwrap();
+                let color = if player_bb[0].at(square) {
+                    Color::Black
+                } else {
+                    Color::White
+                };
+                board[square.0 as usize] = OptionPiece::some(Piece::new(color, kind));
+                bb = bb ^ Bitboard::from_square(square);
+            }
+        }
+
         let mut king_square = [Square(0); 2];
 
         for color_index in 0..2 {
@@ -646,6 +684,7 @@ impl Position {
         }
 
         Position {
+            board,
             hands,
             player_bb,
             piece_bb,
@@ -691,7 +730,7 @@ mod tests {
 
     #[test]
     fn test_position_to_sfen() {
-        let empty_board = [None; 81];
+        let empty_board = [OptionPiece::none(); 81];
         let hands = [Hand([0; 8]), Hand([0; 8])];
         let position = Position::new(empty_board, hands, Color::Black, 1);
         let sfen = position.to_sfen_owned();
@@ -700,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_from_bitboards_empty() {
-        let empty_board = [None; 81];
+        let empty_board = [OptionPiece::none(); 81];
         let hands = [Hand([0; 8]), Hand([0; 8])];
         let original = Position::new(empty_board, hands, Color::Black, 1);
 
@@ -718,17 +757,17 @@ mod tests {
     #[test]
     fn test_from_bitboards_with_pieces() {
         // Create a board with some pieces
-        let mut board = [None; 81];
+        let mut board = [OptionPiece::none(); 81];
         // Black king at 5i (index 4)
-        board[4] = Some(P_B_KING);
+        board[4] = OptionPiece::some(P_B_KING);
         // White king at 5a (index 76)
-        board[76] = Some(P_W_KING);
+        board[76] = OptionPiece::some(P_W_KING);
         // Black pawn at 5g (index 22)
-        board[22] = Some(P_B_PAWN);
+        board[22] = OptionPiece::some(P_B_PAWN);
         // White rook at 8b (index 70)
-        board[70] = Some(P_W_ROOK);
+        board[70] = OptionPiece::some(P_W_ROOK);
         // Black promoted bishop at 3c (index 56)
-        board[56] = Some(P_B_PRO_BISHOP);
+        board[56] = OptionPiece::some(P_B_PRO_BISHOP);
 
         let hands = [
             Hand([1, 0, 0, 0, 0, 0, 2, 0]),

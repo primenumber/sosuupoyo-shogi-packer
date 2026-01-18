@@ -29,7 +29,7 @@
 //! Terminator: all remaining bits are 0 (no more pieces when all-zero pattern detected)
 
 use crate::packer::{Packer, BUFFER_SIZE};
-use crate::{Color, Hand, Piece, PieceKind, Position, Square};
+use crate::{Color, Hand, OptionPiece, Piece, PieceKind, Position, Square};
 
 pub struct PackedSfen;
 
@@ -104,8 +104,8 @@ const HUFFMAN_TABLE: [(u32, u32); 8] = [
 
 impl PackedSfen {
     /// Write a piece (excluding King) to the bit stream using Huffman encoding.
-    fn write_piece(writer: &mut BitWriter, piece: Option<Piece>) {
-        match piece {
+    fn write_piece(writer: &mut BitWriter, piece: OptionPiece) {
+        match piece.to_option() {
             None => {
                 writer.write_one_bit(0); // Empty: 0
             }
@@ -213,10 +213,10 @@ impl PackedSfen {
     }
 
     /// Read a piece (excluding King) from the bit stream.
-    fn read_piece(reader: &mut BitReader) -> Option<Piece> {
+    fn read_piece(reader: &mut BitReader) -> OptionPiece {
         // 0 = empty
         if reader.read_one_bit() == 0 {
-            return None;
+            return OptionPiece::none();
         }
 
         // 10 = pawn
@@ -228,7 +228,7 @@ impl PackedSfen {
             } else {
                 PieceKind::Pawn
             };
-            return Some(Piece::new(color, kind));
+            return OptionPiece::some(Piece::new(color, kind));
         }
 
         // 110x = lance/knight
@@ -242,7 +242,7 @@ impl PackedSfen {
                 } else {
                     PieceKind::Lance
                 };
-                return Some(Piece::new(color, kind));
+                return OptionPiece::some(Piece::new(color, kind));
             } else {
                 // 1101 = knight
                 let color = Color::from_index(reader.read_one_bit() as usize);
@@ -252,7 +252,7 @@ impl PackedSfen {
                 } else {
                     PieceKind::Knight
                 };
-                return Some(Piece::new(color, kind));
+                return OptionPiece::some(Piece::new(color, kind));
             }
         }
 
@@ -265,13 +265,13 @@ impl PackedSfen {
             } else {
                 PieceKind::Silver
             };
-            return Some(Piece::new(color, kind));
+            return OptionPiece::some(Piece::new(color, kind));
         }
 
         // 11110 = gold
         if reader.read_one_bit() == 0 {
             let color = Color::from_index(reader.read_one_bit() as usize);
-            return Some(Piece::new(color, PieceKind::Gold));
+            return OptionPiece::some(Piece::new(color, PieceKind::Gold));
         }
 
         // 111110 = bishop, 111111 = rook
@@ -284,7 +284,7 @@ impl PackedSfen {
             } else {
                 PieceKind::Bishop
             };
-            return Some(Piece::new(color, kind));
+            return OptionPiece::some(Piece::new(color, kind));
         }
 
         // 111111 = rook
@@ -295,7 +295,7 @@ impl PackedSfen {
         } else {
             PieceKind::Rook
         };
-        Some(Piece::new(color, kind))
+        OptionPiece::some(Piece::new(color, kind))
     }
 }
 
@@ -359,7 +359,7 @@ impl Packer for PackedSfen {
         let white_king_sq = reader.read_n_bit(7) as usize;
 
         // Decode board (79 squares, skipping king squares)
-        let mut board = [None; 81];
+        let mut board = [OptionPiece::none(); 81];
         for sq in 0..81 {
             if sq == black_king_sq || sq == white_king_sq {
                 continue;
@@ -368,14 +368,14 @@ impl Packer for PackedSfen {
         }
 
         // Place kings
-        board[black_king_sq] = Some(Piece::new(Color::Black, PieceKind::King));
-        board[white_king_sq] = Some(Piece::new(Color::White, PieceKind::King));
+        board[black_king_sq] = OptionPiece::some(Piece::new(Color::Black, PieceKind::King));
+        board[white_king_sq] = OptionPiece::some(Piece::new(Color::White, PieceKind::King));
 
         // Count pieces on board to determine how many hand pieces to read
         // PieceKind order: Pawn=0, Lance=1, Knight=2, Silver=3, Bishop=4, Rook=5, Gold=6, King=7
         let mut board_piece_counts = [0u8; 8];
         for sq in 0..81 {
-            if let Some(piece) = board[sq] {
+            if let Some(piece) = board[sq].to_option() {
                 let base_idx = piece.kind().index() & 0x7; // Remove promoted flag
                 board_piece_counts[base_idx] += 1;
             }
@@ -459,8 +459,8 @@ mod tests {
         // Test with removed pieces (no hands - hands are computed from board pieces)
         let mut board = Position::startpos().board();
         // Remove some pieces from board to create empty squares
-        board[0] = None; // Remove lance
-        board[72] = None; // Remove lance
+        board[0] = OptionPiece::none(); // Remove lance
+        board[72] = OptionPiece::none(); // Remove lance
 
         // Hands are zeros since we don't have enough bits to encode them
         // in the current format when all pieces are on board
@@ -499,11 +499,11 @@ mod tests {
         let mut buffer = [0u8; 4];
         {
             let mut writer = BitWriter::new(&mut buffer);
-            PackedSfen::write_piece(&mut writer, None);
+            PackedSfen::write_piece(&mut writer, OptionPiece::none());
         }
         let mut reader = BitReader::new(&buffer);
         let decoded = PackedSfen::read_piece(&mut reader);
-        assert_eq!(decoded, None);
+        assert_eq!(decoded, OptionPiece::none());
     }
 
     #[test]
@@ -515,7 +515,7 @@ mod tests {
             }
             for color in 0..2 {
                 let color = Color::from_index(color);
-                let piece = Some(Piece::new(color, kind));
+                let piece = OptionPiece::some(Piece::new(color, kind));
                 let mut buffer = [0u8; 4];
                 {
                     let mut writer = BitWriter::new(&mut buffer);
