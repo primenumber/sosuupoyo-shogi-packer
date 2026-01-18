@@ -309,8 +309,9 @@ mod tests {
         b.iter(|| {
             SSPFv1.pack(&position, &mut buffer).unwrap();
             // Prevent optimization
-            for byte in buffer.iter() {
-                sum += *byte as usize;
+            let (chunks, _) = buffer.as_chunks::<8>();
+            for chunk in chunks.iter() {
+                sum += u64::from_le_bytes(*chunk) as usize;
             }
         });
         assert_ne!(sum, 0);
