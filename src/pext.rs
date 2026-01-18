@@ -23,7 +23,7 @@ pub fn pext_u64(data: u64, mut mask: u64) -> u64 {
     result
 }
 
-#[cfg(any(target_feature = "bmi2", not(target_feature = "avx2")))]
+#[cfg(any(target_feature = "bmi2", not(target_feature = "sse4.2")))]
 #[inline(always)]
 pub fn pext_u64x4<const ENABLE_BYTES: usize>(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
     [
@@ -32,6 +32,94 @@ pub fn pext_u64x4<const ENABLE_BYTES: usize>(data: [u64; 4], mask: [u64; 4]) -> 
         pext_u64(data[2], mask[2]),
         pext_u64(data[3], mask[3]),
     ]
+}
+
+#[cfg(all(
+    not(target_feature = "bmi2"),
+    not(target_feature = "avx2"),
+    target_feature = "sse4.2"
+))]
+#[inline(always)]
+pub fn pext_u64x4<const ENABLE_BYTES: usize>(data: [u64; 4], mask: [u64; 4]) -> [u64; 4] {
+    use std::arch::x86_64::*;
+    unsafe {
+        #[target_feature(enable = "sse4.2")]
+        unsafe fn _mm_pext_epi64_type1(data: __m128i, mask: __m128i) -> __m128i {
+            let data_vec = data;
+            let mut mask_vec = mask;
+            let mut result_vec = _mm_setzero_si128();
+            let mut pos_bit_vec = _mm_set1_epi64x(1);
+            while _mm_testz_si128(mask_vec, mask_vec) == 0 {
+                let lsb_vec = _mm_and_si128(mask_vec, _mm_sub_epi64(_mm_setzero_si128(), mask_vec));
+                let data_and_lsb = _mm_and_si128(data_vec, lsb_vec);
+                let cmp_vec = _mm_cmpeq_epi64(data_and_lsb, _mm_setzero_si128());
+                result_vec = _mm_or_si128(result_vec, _mm_andnot_si128(cmp_vec, pos_bit_vec));
+                mask_vec = _mm_xor_si128(mask_vec, lsb_vec);
+                pos_bit_vec = _mm_add_epi64(pos_bit_vec, pos_bit_vec);
+            }
+            result_vec
+        }
+        #[target_feature(enable = "sse4.2")]
+        fn _mm_pext_epi64_type2<const ENABLE_BYTES: usize>(
+            data_vec: __m128i,
+            mut mask_vec: __m128i,
+        ) -> __m128i {
+            unsafe {
+                let mut result_vec = _mm_setzero_si128();
+                let mut block_mask_vec = _mm_setzero_si128();
+                let mut pos_bit_vec = _mm_set1_epi8(1);
+                let mut popcnt_vec = _mm_setzero_si128();
+                // in-byte processing
+                while _mm_testz_si128(mask_vec, mask_vec) == 0 {
+                    let lsb_vec =
+                        _mm_and_si128(mask_vec, _mm_sub_epi8(_mm_setzero_si128(), mask_vec));
+                    let data_and_lsb = _mm_and_si128(data_vec, lsb_vec);
+                    let mask_zero_mask = _mm_cmpeq_epi8(lsb_vec, _mm_setzero_si128());
+                    let cmp = _mm_cmpeq_epi8(data_and_lsb, _mm_setzero_si128());
+                    result_vec = _mm_or_si128(result_vec, _mm_andnot_si128(cmp, pos_bit_vec));
+                    pos_bit_vec = _mm_add_epi8(pos_bit_vec, pos_bit_vec);
+                    block_mask_vec = _mm_or_si128(
+                        block_mask_vec,
+                        _mm_andnot_si128(mask_zero_mask, pos_bit_vec),
+                    );
+                    mask_vec = _mm_xor_si128(mask_vec, lsb_vec);
+                    popcnt_vec =
+                        _mm_add_epi8(popcnt_vec, _mm_add_epi8(mask_zero_mask, _mm_set1_epi8(1)));
+                }
+                // whole-word processing
+                let mut data_vec = result_vec;
+                let mut shift_vec = {
+                    let x = _mm_add_epi64(popcnt_vec, _mm_slli_epi64(popcnt_vec, 8));
+                    let x = _mm_add_epi64(x, _mm_slli_epi64(x, 16));
+                    let x = _mm_add_epi64(x, _mm_slli_epi64(x, 32));
+                    _mm_slli_epi64(x, 8)
+                };
+                let mut result_vec = _mm_setzero_si128();
+                let low_byte_mask = _mm_set1_epi64x(0xFF);
+                for _ in 0..ENABLE_BYTES {
+                    let group_vec = _mm_and_si128(data_vec, low_byte_mask);
+                    let shifted_vec =
+                        _mm_sllv_epi64(group_vec, _mm_and_si128(shift_vec, low_byte_mask));
+                    result_vec = _mm_or_si128(result_vec, shifted_vec);
+                    data_vec = _mm_srli_epi64(data_vec, 8);
+                    shift_vec = _mm_srli_epi64(shift_vec, 8);
+                }
+                result_vec
+            }
+        }
+        let data_vec_0 = _mm_loadu_si128(data.as_ptr() as *const __m128i);
+        let data_vec_1 = _mm_loadu_si128(data.as_ptr().add(2) as *const __m128i);
+        let mask_vec_0 = _mm_loadu_si128(mask.as_ptr() as *const __m128i);
+        let mask_vec_1 = _mm_loadu_si128(mask.as_ptr().add(2) as *const __m128i);
+        let result_vec_0 = _mm_pext_epi64_type1(data_vec_0, mask_vec_0);
+        let result_vec_1 = _mm_pext_epi64_type1(data_vec_1, mask_vec_1);
+        //let result_vec_0 = _mm_pext_epi64_type2::<ENABLE_BYTES>(data_vec_0, mask_vec_0);
+        //let result_vec_1 = _mm_pext_epi64_type2::<ENABLE_BYTES>(data_vec_1, mask_vec_1);
+        let mut result = [0u64; 4];
+        _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, result_vec_0);
+        _mm_storeu_si128(result.as_mut_ptr().add(2) as *mut __m128i, result_vec_1);
+        result
+    }
 }
 
 #[cfg(all(not(target_feature = "bmi2"), target_feature = "avx2"))]
