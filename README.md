@@ -2,10 +2,44 @@ sosuupoyo-shogi-packer
 ====
 
 将棋の局面を256bitのビット列に高速にエンコード可能なSSPFv1の参照実装です。
+高速なpack/unpackのためには、PEXT/PDEP命令をサポートするCPUが必要です(BMI2対応CPU)。
+PEXTが高速でないCPUのうち、AVX2が利用可能な場合はある程度の高速化が期待できます。
+AVX2も利用できない場合は、PackedSfenの方が高速です。
+
+## ベンチマーク
+
+AMD Ryzen 9 7950X3D 上でのベンチマーク結果です。
+
+PackedSfenは --features byteboard オプション付きでビルドしています。
+このオプションを付けると、盤面の状態を表すboard変数を追加で持つようになり、packが高速化されます。
+
+一方、SSPFv1はboard変数は不要で、逆にunpack時に盤面を復元するコストが増えるため、--features byteboard オプションは付けていません。
+
+### pack
+
+| flags | PackedSfen (ns/iter) | SSPFv1 (ns/iter) | Speedup |
+|-------|----------------------|------------------|---------|
+| none  | 94.13                | 167.90           | 0.56x   |
+| target-cpu=native | 106.36   | 10.23            | 10.3x   |
+| target-feature=+bmi2 | 94.16 | 14.53            | 6.48x   |
+| target-feature=+avx2 | 94.60 | 40.27            | 2.35x   |
+| target-feature=+sse4.2 | 94.43 | 124.62         | 0.76x   |
+
+### unpack
+
+| flags | PackedSfen (ns/iter) | SSPFv1 (ns/iter) | Speedup |
+|-------|----------------------|------------------|---------|
+| none  | 228.61               | 125.54           | 1.82x   |
+| target-cpu=native | 218.89   | 19.10            | 11.5x   |
+| target-feature=+bmi2 | 235.37 | 32.10           | 7.33x   |
+| target-feature=+avx2 | 224.46 | 123.43          | 1.82x   |
+| target-feature=+sse4.2 | 230.82 | 124.67        | 1.85x   |
 
 ## ファイル構成
 
-- `src/packer.rs`: SSPFv1フォーマットのエンコード実装。
+- `src/packer.rs`: Packerトレイトの定義。
+- `src/packed_sfen.rs`: PackedSfenフォーマットのエンコード実装。
+- `src/sspfv1.rs`: SSPFv1フォーマットのエンコード実装。
 - `src/position.rs`: 将棋の局面表現。Bitboard、駒、持ち駒、局面を表す最小限の実装（shogi\_coreクレートベース）。
 - `src/pext.rs`: PEXT命令のラッパー。BMI2対応CPUでは`_pext_u64`を使用。
 - `src/pdep.rs`: PDEP命令のラッパー。PEXT同様にBMI2対応CPUでは`_pdep_u64`を使用。
