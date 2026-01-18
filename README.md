@@ -9,12 +9,17 @@ AVX2も利用できない場合は、PackedSfenの方が高速です。
 
 ## ベンチマーク
 
-AMD Ryzen 9 7950X3D 上でのベンチマーク結果です。
 
 PackedSfenは --features byteboard オプション付きでビルドしています。
 このオプションを付けると、盤面の状態を表すboard変数を追加で持つようになり、packが高速化されます。
 
 一方、SSPFv1はboard変数は不要で、逆にunpack時に盤面を復元するコストが増えるため、--features byteboard オプションは付けていません。
+
+### ベンチマーク環境
+
+- CPU: Ryzen 9 7950X3D
+- OS: WSL2 on Windows11
+- Compiler: rustc 1.94.0-nightly (fe98ddcfc 2026-01-17)
 
 ### pack
 
