@@ -386,6 +386,7 @@ pub struct Square(pub u8);
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Position {
+    #[cfg(feature = "byteboard")]
     board: [OptionPiece; 81],
     hands: [Hand; 2],
     player_bb: [Bitboard; 2],
@@ -418,6 +419,7 @@ impl Position {
             }
         }
         Position {
+            #[cfg(feature = "byteboard")]
             board,
             hands,
             player_bb,
@@ -608,8 +610,30 @@ impl Position {
         Ok(())
     }
 
+    #[cfg(feature = "byteboard")]
     pub fn board(&self) -> [OptionPiece; 81] {
         self.board
+    }
+
+    #[cfg(not(feature = "byteboard"))]
+    pub fn board(&self) -> [OptionPiece; 81] {
+        let mut board = [OptionPiece::none(); 81];
+
+        for (kind_index, bb) in self.piece_bb.iter().enumerate() {
+            let kind = PieceKind::from_index(kind_index);
+            let mut bb = *bb;
+            while bb.any() {
+                let square = bb.peek().unwrap();
+                let color = if self.player_bb[0].at(square) {
+                    Color::Black
+                } else {
+                    Color::White
+                };
+                board[square.0 as usize] = OptionPiece::some(Piece::new(color, kind));
+                bb = bb ^ Bitboard::from_square(square);
+            }
+        }
+        board
     }
 
     #[inline(always)]
@@ -623,8 +647,29 @@ impl Position {
     }
 
     #[inline(always)]
+    #[cfg(feature = "byteboard")]
     pub fn at(&self, square: Square) -> OptionPiece {
         self.board[square.0 as usize]
+    }
+
+    #[inline(always)]
+    #[cfg(not(feature = "byteboard"))]
+    pub fn at(&self, square: Square) -> OptionPiece {
+        let color = if self.player_bb[0].at(square) {
+            Color::Black
+        } else if self.player_bb[1].at(square) {
+            Color::White
+        } else {
+            return OptionPiece::none();
+        };
+        for (kind_index, bb) in self.piece_bb.iter().enumerate() {
+            if bb.at(square) {
+                let kind = PieceKind::from_index(kind_index);
+                let piece = Piece::new(color, kind);
+                return OptionPiece::some(piece);
+            }
+        }
+        unreachable!()
     }
 
     #[inline(always)]
@@ -650,6 +695,7 @@ impl Position {
 
     /// Construct a Position from bitboards instead of board array.
     /// This is the inverse of extracting player_bb and piece_bb from a Position.
+    #[cfg(feature = "byteboard")]
     pub fn from_bitboards(
         player_bb: [Bitboard; 2],
         piece_bb: [Bitboard; 14],
@@ -685,6 +731,35 @@ impl Position {
 
         Position {
             board,
+            hands,
+            player_bb,
+            piece_bb,
+            king_square,
+            side_to_move,
+            ply,
+        }
+    }
+
+    /// Construct a Position from bitboards instead of board array.
+    /// This is the inverse of extracting player_bb and piece_bb from a Position.
+    #[cfg(not(feature = "byteboard"))]
+    pub fn from_bitboards(
+        player_bb: [Bitboard; 2],
+        piece_bb: [Bitboard; 14],
+        hands: [Hand; 2],
+        side_to_move: Color,
+        ply: u32,
+    ) -> Self {
+        let mut king_square = [Square(0); 2];
+
+        for color_index in 0..2 {
+            let king_bb = piece_bb[PieceKind::King.index()] & player_bb[color_index];
+            if let Some(sq) = king_bb.peek() {
+                king_square[color_index] = sq;
+            }
+        }
+
+        Position {
             hands,
             player_bb,
             piece_bb,
