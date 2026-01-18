@@ -111,8 +111,8 @@ impl SSPFv1 {
             | bit3.wrapping_shl(14)
             | bit4.wrapping_shl(22)
             | color_bits.wrapping_shl(26);
-        for i in 0..4 {
-            buf[i * 8..(i + 1) * 8].copy_from_slice(&tmp[i].to_le_bytes());
+        for (i, word) in tmp.iter().enumerate() {
+            buf[i * 8..(i + 1) * 8].copy_from_slice(&word.to_le_bytes());
         }
         Some(())
     }
