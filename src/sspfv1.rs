@@ -257,6 +257,17 @@ mod tests {
     use std::hint::black_box;
     use test::Bencher;
 
+    fn sfen_list() -> [&'static str; 5] {
+        const SFENS: [&str; 5] = [
+            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+            "3k3nl/G3n2r1/P1P+LB+B1p1/1G2ppp1p/KP1P1P1P1/p2sP1P1P/5SN2/4G4/L+R6L w 2Ppn2SG 1",
+            "lr5nl/3g1kg2/2n1ppsp1/p1pps1p1p/1p5P1/P1PPSPP1P/1PS1P1N2/2GK1G3/LN5RL w Bb 1",
+            "l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w RGgsn5p 1",
+            "4k4/9/9/9/9/9/9/9/4K4 b 9P2L2N2S2GRB9p2l2n2s2grb 1",
+        ];
+        SFENS
+    }
+
     #[test]
     fn test_pack_hands() {
         let hand_black = Hand([2, 1, 0, 0, 1, 0, 0, 0]);
@@ -284,12 +295,7 @@ mod tests {
 
     #[test]
     fn test_pack_unpack_roundtrip() {
-        let sfens = [
-            "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
-            "lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/9/LNSGKGSNL b BRbr 1",
-            "3k3nl/G3n2r1/P1P+LB+B1p1/1G2ppp1p/KP1P1P1P1/p2sP1P1P/5SN2/4G4/L+R6L w 2Ppn2SG 1",
-        ];
-        for sfen in sfens.iter() {
+        for sfen in sfen_list().iter() {
             let position = Position::from_sfen(sfen).unwrap();
             let mut buffer = [0u8; BUFFER_SIZE];
 
@@ -304,25 +310,36 @@ mod tests {
 
     #[bench]
     fn bench_pack(b: &mut Bencher) {
-        let position = Position::startpos();
+        let positions = sfen_list()
+            .iter()
+            .map(|sfen| Position::from_sfen(sfen).unwrap())
+            .collect::<Vec<_>>();
         let mut buffer = [0u8; BUFFER_SIZE];
+        let mut iter = positions.iter().cycle();
         b.iter(|| {
             SSPFv1
-                .pack(black_box(&position), black_box(&mut buffer))
+                .pack(black_box(iter.next().unwrap()), black_box(&mut buffer))
                 .unwrap();
         });
     }
 
     #[bench]
     fn bench_unpack(b: &mut Bencher) {
-        let position = Position::startpos();
-        let mut buffer = [0u8; BUFFER_SIZE];
-        SSPFv1.pack(&position, &mut buffer).unwrap();
+        let buffers = sfen_list()
+            .iter()
+            .map(|sfen| Position::from_sfen(sfen).unwrap())
+            .map(|position| {
+                let mut buffer = [0u8; BUFFER_SIZE];
+                SSPFv1.pack(&position, &mut buffer).unwrap();
+                buffer
+            })
+            .collect::<Vec<_>>();
 
         let mut unpacked = Position::set_only_kings();
+        let mut iter = buffers.iter().cycle();
         b.iter(|| {
             SSPFv1
-                .unpack(black_box(&buffer), black_box(&mut unpacked))
+                .unpack(black_box(iter.next().unwrap()), black_box(&mut unpacked))
                 .unwrap();
         });
     }
