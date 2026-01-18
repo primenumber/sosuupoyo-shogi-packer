@@ -434,6 +434,7 @@ mod tests {
     use super::*;
     use crate::packer::BUFFER_SIZE;
     use crate::position::*;
+    use std::hint::black_box;
     use test::Bencher;
 
     #[test]
@@ -533,14 +534,11 @@ mod tests {
     fn bench_pack(b: &mut Bencher) {
         let position = Position::startpos();
         let mut buffer = [0u8; BUFFER_SIZE];
-        let mut sum = 0;
         b.iter(|| {
-            PackedSfen.pack(&position, &mut buffer).unwrap();
-            for byte in buffer.iter() {
-                sum += *byte as usize;
-            }
+            PackedSfen
+                .pack(black_box(&position), black_box(&mut buffer))
+                .unwrap();
         });
-        assert_ne!(sum, 0);
     }
 
     #[bench]
@@ -550,11 +548,10 @@ mod tests {
         PackedSfen.pack(&position, &mut buffer).unwrap();
 
         let mut unpacked = Position::startpos();
-        let mut sum = 0;
         b.iter(|| {
-            PackedSfen.unpack(&buffer, &mut unpacked).unwrap();
-            sum += unpacked.king_square(Color::Black).0 as usize;
+            PackedSfen
+                .unpack(black_box(&buffer), black_box(&mut unpacked))
+                .unwrap();
         });
-        assert_ne!(sum, 0);
     }
 }

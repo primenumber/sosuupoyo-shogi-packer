@@ -254,6 +254,7 @@ mod tests {
     extern crate test;
     use super::*;
     use crate::position::*;
+    use std::hint::black_box;
     use test::Bencher;
 
     #[test]
@@ -306,7 +307,9 @@ mod tests {
         let position = Position::startpos();
         let mut buffer = [0u8; BUFFER_SIZE];
         b.iter(|| {
-            SSPFv1.pack(&position, &mut buffer).unwrap();
+            SSPFv1
+                .pack(black_box(&position), black_box(&mut buffer))
+                .unwrap();
         });
     }
 
@@ -318,7 +321,9 @@ mod tests {
 
         let mut unpacked = Position::set_only_kings();
         b.iter(|| {
-            SSPFv1.unpack(&buffer, &mut unpacked).unwrap();
+            SSPFv1
+                .unpack(black_box(&buffer), black_box(&mut unpacked))
+                .unwrap();
         });
     }
 }
