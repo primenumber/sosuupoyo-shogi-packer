@@ -56,7 +56,7 @@ impl<'a> BitWriter<'a> {
         if value != 0 {
             let byte_pos = self.cursor >> 3;
             let bit_pos = self.cursor & 7;
-            self.buffer[byte_pos as usize] |= 1 << bit_pos;
+            unsafe { *self.buffer.get_unchecked_mut(byte_pos as usize) |= 1 << bit_pos };
         }
         self.cursor += 1;
     }
@@ -84,7 +84,8 @@ impl<'a> BitReader<'a> {
     fn read_one_bit(&mut self) -> u32 {
         let byte_pos = self.cursor >> 3;
         let bit_pos = self.cursor & 7;
-        let bit = ((self.buffer[byte_pos as usize] >> bit_pos) & 1) as u32;
+        let bit =
+            ((unsafe { *self.buffer.get_unchecked(byte_pos as usize) } >> bit_pos) & 1) as u32;
         self.cursor += 1;
         bit
     }
@@ -115,7 +116,7 @@ impl PackedSfen {
                 let is_promoted = kind.index() >= PieceKind::ProPawn.index();
 
                 let raw_kind_index = kind.index() & 0x7; // Remove promoted flag
-                let (bits, length) = HUFFMAN_TABLE[raw_kind_index + 1];
+                let (bits, length) = unsafe { *HUFFMAN_TABLE.get_unchecked(raw_kind_index + 1) };
                 // +1 to skip empty
                 writer.write_n_bit(bits, length);
                 writer.write_one_bit(color_bit);
@@ -132,7 +133,7 @@ impl PackedSfen {
     fn write_hand_piece(writer: &mut BitWriter, kind: PieceKind, color: Color) {
         let color_bit = color as u32;
         let kind_index = kind.index();
-        let (bits, length) = HUFFMAN_TABLE[kind_index + 1];
+        let (bits, length) = unsafe { *HUFFMAN_TABLE.get_unchecked(kind_index + 1) };
         writer.write_n_bit(bits >> 1, length - 1); // -1 to remove empty branch
         writer.write_one_bit(color_bit);
         if kind == PieceKind::Gold {
