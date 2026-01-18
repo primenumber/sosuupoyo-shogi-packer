@@ -24,10 +24,12 @@ pub struct Bitboard(pub u64, pub u64);
 const MASK_81: Bitboard = Bitboard(0x7FFF_FFFF_FFFF_FFFF, 0x3_FFFF);
 
 impl Bitboard {
+    #[inline(always)]
     pub fn bitnot_raw(self) -> Bitboard {
         Bitboard(!self.0, !self.1)
     }
 
+    #[inline(always)]
     pub fn from_square(square: Square) -> Self {
         let square = square.0 as u32;
         if square < 63 {
@@ -37,6 +39,7 @@ impl Bitboard {
         }
     }
 
+    #[inline(always)]
     pub fn at(&self, square: Square) -> bool {
         let square = square.0 as u32;
         if square < 63 {
@@ -46,6 +49,7 @@ impl Bitboard {
         }
     }
 
+    #[inline(always)]
     pub fn peek(&self) -> Option<Square> {
         if self.0 != 0 {
             let lsb = self.0 & self.0.wrapping_neg();
@@ -64,6 +68,7 @@ impl Bitboard {
 impl BitAnd for Bitboard {
     type Output = Bitboard;
 
+    #[inline(always)]
     fn bitand(self, rhs: Bitboard) -> Bitboard {
         Bitboard(self.0 & rhs.0, self.1 & rhs.1)
     }
@@ -72,6 +77,7 @@ impl BitAnd for Bitboard {
 impl BitOr for Bitboard {
     type Output = Bitboard;
 
+    #[inline(always)]
     fn bitor(self, rhs: Bitboard) -> Bitboard {
         Bitboard(self.0 | rhs.0, self.1 | rhs.1)
     }
@@ -80,6 +86,7 @@ impl BitOr for Bitboard {
 impl BitXor for Bitboard {
     type Output = Bitboard;
 
+    #[inline(always)]
     fn bitxor(self, rhs: Bitboard) -> Bitboard {
         Bitboard(self.0 ^ rhs.0, self.1 ^ rhs.1)
     }
@@ -88,6 +95,7 @@ impl BitXor for Bitboard {
 impl Not for Bitboard {
     type Output = Bitboard;
 
+    #[inline(always)]
     fn not(self) -> Bitboard {
         self.bitnot_raw() & MASK_81
     }
@@ -100,6 +108,7 @@ pub enum Color {
 }
 
 impl Color {
+    #[inline(always)]
     const fn index(&self) -> usize {
         match self {
             Color::Black => 0,
@@ -107,6 +116,7 @@ impl Color {
         }
     }
 
+    #[inline(always)]
     pub fn from_index(index: usize) -> Self {
         unsafe { std::mem::transmute(index as u8) }
     }
@@ -140,10 +150,12 @@ pub enum PieceKind {
 }
 
 impl PieceKind {
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         *self as usize
     }
 
+    #[inline(always)]
     pub fn from_index(index: usize) -> Self {
         unsafe { std::mem::transmute(index as u8) }
     }
@@ -212,6 +224,7 @@ pub const P_W_PRO_BISHOP: Piece = Piece::new(Color::White, PieceKind::ProBishop)
 pub const P_W_PRO_ROOK: Piece = Piece::new(Color::White, PieceKind::ProRook);
 
 impl Piece {
+    #[inline(always)]
     pub const fn new(color: Color, kind: PieceKind) -> Self {
         let kind_index = kind.index() as u8;
         let color_index = color.index() as u8;
@@ -220,11 +233,13 @@ impl Piece {
         }
     }
 
+    #[inline(always)]
     pub fn kind(&self) -> PieceKind {
         let kind_index = (self.value & 0x0F) as usize;
         PieceKind::from_index(kind_index)
     }
 
+    #[inline(always)]
     pub fn color(&self) -> Color {
         let color_index = (self.value >> 4) as usize;
         Color::from_index(color_index)
@@ -560,14 +575,17 @@ impl Position {
         board
     }
 
+    #[inline(always)]
     pub fn player_bb(&self, color: Color) -> Bitboard {
         self.player_bb[color.index()]
     }
 
+    #[inline(always)]
     pub fn occupied_bitboard(&self) -> Bitboard {
         self.player_bb[0] | self.player_bb[1]
     }
 
+    #[inline(always)]
     pub fn at(&self, square: Square) -> Option<Piece> {
         if !self.occupied_bitboard().at(square) {
             return None;
@@ -586,19 +604,23 @@ impl Position {
         None
     }
 
+    #[inline(always)]
     pub fn piece_kind_bitboard(&self, kind: PieceKind) -> Bitboard {
         let index = kind.index();
         self.piece_bb[index]
     }
 
+    #[inline(always)]
     pub fn side_to_move(&self) -> Color {
         self.side_to_move
     }
 
+    #[inline(always)]
     pub fn king_square(&self, color: Color) -> Square {
         self.king_square[color.index()]
     }
 
+    #[inline(always)]
     pub fn hand(&self, color: Color) -> &Hand {
         &self.hands[color.index()]
     }
