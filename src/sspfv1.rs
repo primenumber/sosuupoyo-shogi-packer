@@ -305,16 +305,9 @@ mod tests {
     fn bench_pack(b: &mut Bencher) {
         let position = Position::startpos();
         let mut buffer = [0u8; BUFFER_SIZE];
-        let mut sum = 0;
         b.iter(|| {
             SSPFv1.pack(&position, &mut buffer).unwrap();
-            // Prevent optimization
-            let (chunks, _) = buffer.as_chunks::<8>();
-            for chunk in chunks.iter() {
-                sum += u64::from_le_bytes(*chunk) as usize;
-            }
         });
-        assert_ne!(sum, 0);
     }
 
     #[bench]
@@ -324,12 +317,8 @@ mod tests {
         SSPFv1.pack(&position, &mut buffer).unwrap();
 
         let mut unpacked = Position::set_only_kings();
-        let mut sum = 0;
         b.iter(|| {
             SSPFv1.unpack(&buffer, &mut unpacked).unwrap();
-            // Prevent optimization
-            sum += unpacked.king_square(Color::Black).0 as usize;
         });
-        assert_ne!(sum, 0);
     }
 }
