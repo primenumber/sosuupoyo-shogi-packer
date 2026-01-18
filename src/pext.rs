@@ -66,7 +66,6 @@ pub fn pext_u64x4<const ENABLE_BYTES: usize>(data: [u64; 4], mask: [u64; 4]) -> 
         }
         // whole-word processing
         let mut data_vec = result_vec;
-        let mut mask_vec = block_mask_vec;
         let mut shift_vec = {
             let x = _mm256_add_epi64(popcnt_vec, _mm256_slli_epi64(popcnt_vec, 8));
             let x = _mm256_add_epi64(x, _mm256_slli_epi64(x, 16));
